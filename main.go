@@ -54,6 +54,7 @@ func main() {
 
 	mux := http.NewServeMux()
 	api.RegisterFrontend(mux, st)
+	api.RegisterRewardTypes(mux)
 	api.RegisterProposals(mux, st)
 	api.RegisterBusiness(mux, st)
 	api.RegisterRecommendations(mux, st)

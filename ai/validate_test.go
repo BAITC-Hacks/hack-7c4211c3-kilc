@@ -88,6 +88,13 @@ func TestParseCardDropsUnknownKey(t *testing.T) {
 	}
 }
 
+func TestParseCardDropsRewardFields(t *testing.T) {
+	card, _ := mustParseCard(t, `{"card":{"title":"Задача","context":"Пять важных слов для контекста задачи","reward":"Грант 300 000 ₸","reward_type":"money"}}`, "Задача с грантом 300 000 ₸", nil)
+	if card.Title != "Задача" || card.Context != "Пять важных слов для контекста задачи" {
+		t.Fatalf("allowed fields were not kept: %+v", card)
+	}
+}
+
 func TestParseCardCategory(t *testing.T) {
 	card, dropped := mustParseCard(t, `{"card":{"category":"fintech"}}`, "x", nil)
 	if card.Category != "" || !droppedHas(dropped, "category:") {
