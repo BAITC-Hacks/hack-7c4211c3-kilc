@@ -41,10 +41,10 @@ func recommend(team store.Team, tasks []store.Task, limit int) []recommendation 
 		eligible = append(eligible, task)
 	}
 	sort.Slice(eligible, func(i, j int) bool {
-		if eligible[i].Score == eligible[j].Score {
+		if eligible[i].Score+eligible[i].Bonus == eligible[j].Score+eligible[j].Bonus {
 			return eligible[i].ID > eligible[j].ID
 		}
-		return eligible[i].Score > eligible[j].Score
+		return eligible[i].Score+eligible[i].Bonus > eligible[j].Score+eligible[j].Bonus
 	})
 	if limit > 5 {
 		limit = 5

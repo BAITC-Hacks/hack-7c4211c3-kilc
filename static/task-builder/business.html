@@ -3,16 +3,14 @@
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Кабинет бизнеса — TaskLab</title>
-  <link rel="stylesheet" href="/static/task-builder/account.css"><script src="/static/nav.js" defer></script>
-  <script src="/static/task-builder/client.js" defer></script><script src="/static/task-builder/business.js" defer></script>
-</head>
+  <link rel="stylesheet" href="/static/task-builder/account.css"><script src="/static/task-builder/client.js" defer></script><script src="/static/nav.js" defer></script><script src="/static/chat.js" defer></script><script src="/static/task-builder/business.js" defer></script>
+<link rel="stylesheet" href="/static/chat.css"></head>
 <body>
-  <header class="topbar"><a class="brand" href="/">◈ TaskLab</a><nav class="nav" aria-label="Основная навигация"><a href="/">Каталог</a><a href="/static/task-builder/index.html">Новая задача</a><a href="/static/task-builder/teams.html">Команды</a><a href="/static/task-builder/business.html">Кабинет бизнеса</a><a href="/static/task-builder/login.html" data-role-link>Роль: не выбрана</a></nav></header>
+  <header class="topbar"><a class="brand" href="/">◈ TaskLab</a><nav class="nav" aria-label="Основная навигация"><span class="hint">Загрузка…</span></nav><span id="session-badge" class="session-badge"></span></header>
   <main>
-    <div class="page-heading"><div><span class="eyebrow">КАБИНЕТ БИЗНЕСА</span><h1>Ваши задачи и команды</h1><p>Сравните предложения и выберите, с кем продолжить работу.</p></div></div>
-    <div class="business-tools"><div class="field"><label for="company">Компания</label><select id="company"><option value="">Все компании</option></select></div><button id="refresh" type="button" class="secondary">Обновить</button></div>
+    <div class="page-heading"><div><span class="eyebrow">КАБИНЕТ БИЗНЕСА</span><h1>Мои задачи</h1><p>Задачи вашей компании. Откройте отклики, сравните решения и выберите подходящую команду.</p></div></div>
+    <div class="business-tools"><p class="company-label">Компания: <strong id="company-name"></strong></p><button id="refresh" type="button" class="secondary">Обновить</button></div>
     <p id="business-error" class="message" role="alert"></p>
-    <p id="storage-note" class="hint" role="status"></p>
     <p id="operation-status" class="hint" role="status" aria-live="polite"></p>
     <section aria-labelledby="tasks-heading"><h2 id="tasks-heading">Задачи</h2><p id="task-count" class="hint"></p><div id="task-list" class="business-tasks"></div></section>
     <section id="proposals-panel" aria-labelledby="panel-title" hidden>

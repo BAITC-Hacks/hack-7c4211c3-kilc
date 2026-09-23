@@ -63,6 +63,7 @@ form.addEventListener('submit', async event => {
   try {
     await detailedRequest(`/api/tasks/${taskID}/proposals`, { method: 'POST', body: JSON.stringify(body) });
     form.reset();
+    form.elements.team_id.value = String(TaskLab.session.team_id);
     $('#proposal-message').textContent = 'Предложение отправлено. Решение принимает представитель бизнеса.';
     $('#proposal-message').classList.add('success');
     await refreshCount();
@@ -74,6 +75,7 @@ form.addEventListener('submit', async event => {
   } finally {
     sending = false;
     for (const control of form.elements) control.disabled = false;
+    form.elements.team_id.disabled = true;
     $('#submit-proposal').textContent = 'Отправить предложение';
     form.querySelector('[aria-invalid=true]')?.focus();
   }
@@ -84,6 +86,7 @@ async function init() {
     $('#page-message').textContent = 'Задача не найдена или не опубликована'; return;
   }
   try {
+    await TaskLab.ready;
     const task = await detailedRequest(`/api/tasks/${taskID}`);
     if (task.status !== 'published') {
       $('#page-message').textContent = 'Задача не найдена или не опубликована'; return;
@@ -94,10 +97,11 @@ async function init() {
     $('#task-meta').textContent = [task.company, task.industry, categories.find(c => c.code === task.category)?.label].filter(Boolean).join(' · ');
     $('#task-score').textContent = task.rating.total;
     $('#task-level').textContent = task.rating.level_label;
+    if (task.rating.bonus) $('#task-level').after(node('p', `Бонус за вознаграждение: +${task.rating.bonus} · Приоритет в каталоге: ${task.rating.position}`, 'reward-note'));
     $('#draft-note').hidden = task.rating.level !== 'draft';
     const fields = [ ['context', 'Контекст'], ['need', 'Потребность'], ['users', 'Пользователи'], ['data', 'Данные и материалы'],
       ['constraints', 'Ограничения'], ['expected_result', 'Ожидаемый результат'], ['success_criteria', 'Критерии успеха'],
-      ['contact', 'Контакт'], ['interaction_format', 'Формат взаимодействия'] ];
+      ['contact', 'Контакт'], ['interaction_format', 'Формат взаимодействия'], ['reward', 'Вознаграждение'] ];
     for (const [key, label] of fields) $('#task-fields').append(node('dt', label), node('dd', task[key]?.trim() || 'Не указано'));
     for (const part of task.rating.components) {
       const row = node('div', undefined, 'criterion');
@@ -113,16 +117,19 @@ async function init() {
 }
 
 async function loadTeams() {
+  if (TaskLab.session.role !== 'student') return;
+  if (!TaskLab.session.team_id) {
+    const link = node('a', 'Вступить в команду, чтобы отправить предложение →', 'text-link');
+    link.href = 'teams.html'; $('#page-message').append(link); return;
+  }
   try {
     const teams = await request('/api/teams');
-    if (!teams.length) { $('#page-message').textContent = 'Пока нет команд. Создайте команду на странице «Команды», затем обновите эту страницу.'; return; }
-    for (const team of teams) form.elements.team_id.append(new Option(team.name, String(team.id)));
-    try {
-      const selected = sessionStorage.getItem('tasklab-selected-team');
-      if (teams.some(team => String(team.id) === selected)) form.elements.team_id.value = selected;
-      else if (selected) $('#team-note').textContent = 'Ранее выбранная команда недоступна. Выберите другую.';
-    } catch { $('#team-note').textContent = 'Не удалось прочитать выбранную команду. Выберите её в списке.'; }
+    const team = teams.find(t => t.id === TaskLab.session.team_id);
+    if (!team) throw new Error('Ваша команда недоступна. Обратитесь к организатору.');
+    form.elements.team_id.replaceChildren(new Option(team.name, String(team.id), true, true));
+    form.elements.team_id.disabled = true;
+    $('#team-note').textContent = 'Предложение будет отправлено от вашей команды.';
     $('#proposal-section').hidden = false;
-  } catch (error) { $('#page-message').textContent = `Не удалось загрузить команды: ${error.message}`; }
+  } catch (error) { $('#page-message').textContent = error.message; }
 }
 init();

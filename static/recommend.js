@@ -9,7 +9,7 @@
   async function load() {
     const version = ++revision;
     let teamID;
-    try { teamID = sessionStorage.getItem('tasklab-selected-team'); }
+    try { await TaskLab.ready; if (TaskLab.session.role !== 'student') { section.hidden = true; return; } teamID = TaskLab.session.team_id; }
     catch {
       section.hidden = false;
       section.replaceChildren(node('p', 'Не удалось прочитать выбранную команду. Разрешите хранение данных в браузере.', 'message'));
@@ -29,7 +29,7 @@
       const list = node('div', undefined, 'catalog');
       for (const item of items) {
         const card = node('article', undefined, `card level-${item.level}`);
-        const link = node('a', item.title);
+        const link = node('a', item.title, 'card-link');
         link.href = `/static/task-builder/task.html?id=${encodeURIComponent(item.id)}`;
         const title = node('h3'); title.append(link);
         card.append(title,

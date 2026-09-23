@@ -24,3 +24,15 @@ window.TaskLab = {
     return node;
   }
 };
+
+TaskLab.ready = TaskLab.request('/api/session').then(session => {
+  TaskLab.session = session;
+  try {
+    sessionStorage.setItem('tasklab-role', session.role);
+    if (session.team_id) sessionStorage.setItem('tasklab-selected-team', String(session.team_id));
+    else sessionStorage.removeItem('tasklab-selected-team');
+  } catch { /* Server session remains authoritative when storage is unavailable. */ }
+  return session;
+});
+// Consumers display their own contextual error; avoid an unhandled rejection.
+TaskLab.ready.catch(() => {});

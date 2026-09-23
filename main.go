@@ -73,7 +73,7 @@ func main() {
 
 	addr := ":" + port
 	log.Printf("слушаю %s, база %s", addr, dbPath)
-	if err := http.ListenAndServe(addr, mux); err != nil {
+	if err := http.ListenAndServe(addr, api.SessionAccess(st, mux)); err != nil {
 		log.Fatalf("сервер: %v", err)
 	}
 }

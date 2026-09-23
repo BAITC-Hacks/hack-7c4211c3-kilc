@@ -62,6 +62,7 @@ function lock(locked) {
   busy = locked;
   for (const control of form.elements) control.disabled = locked;
   form.elements.draft_text.readOnly = Boolean(taskId);
+  form.elements.company.readOnly = true;
 }
 function updateChecks() {
   const data = values();
@@ -154,6 +155,7 @@ function preview(task) {
     if (field.id === 'category') text = form.elements.category.selectedOptions[0]?.textContent || text;
     list.append(node('dt', field.label), node('dd', text));
   }
+  list.append(node('dt', 'Вознаграждение'), node('dd', task.reward || 'Не предусмотрено'));
   container.append(list); $('#preview').hidden = false; showRating(task.rating);
 }
 async function save(publish) {
@@ -190,7 +192,7 @@ $('#publish').addEventListener('click', () => save(true));
 $('#reset').textContent = 'Новая задача';
 $('#reset').addEventListener('click', () => {
   if (!confirm('Начать новую задачу? Несохранённые изменения будут потеряны. Записи в базе останутся.')) return;
-  form.reset(); taskId = null; qa = []; questionsDraft = ''; confirmed.clear(); currentTask = null;
+  form.reset(); form.elements.company.value = TaskLab.session.company; taskId = null; qa = []; questionsDraft = ''; confirmed.clear(); currentTask = null;
   renderQuestions(); $('#ai-status').textContent = '';
   history.replaceState(null, '', location.pathname); form.elements.draft_text.readOnly = false;
   $('#preview').hidden = true; saveLocalDraft(); updateChecks(); invalidateRating();
@@ -255,6 +257,7 @@ async function init() {
   lock(true);
   const requestedID = new URLSearchParams(location.search).get('id');
   try {
+    await TaskLab.ready;
     const categories = await request('/api/categories');
     form.elements.category.append(new Option('Не выбрана', ''));
     for (const category of categories) form.elements.category.append(new Option(category.label, category.code));
@@ -284,6 +287,7 @@ async function init() {
         }
       } catch { setStatus('Не удалось восстановить локальный черновик. Заполните поля заново.'); }
     }
+    form.elements.company.value = TaskLab.session.company;
     renderQuestions(); lock(false); updateChecks(); await refreshRating();
   } catch (error) {
     setStatus(`${error.message} После исправления обновите страницу.`);

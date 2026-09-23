@@ -1,7 +1,6 @@
 'use strict';
 const { request, node } = window.TaskLab;
 const $ = selector => document.querySelector(selector);
-const COMPANY_KEY = 'tasklab-company';
 const statusLabels = { pending: 'Ожидает решения', accepted: 'Принято', rejected: 'Отклонено' };
 let tasks = [];
 let categories = [];
@@ -29,10 +28,14 @@ function renderTasks() {
   for (const task of tasks) {
     const card = node('article', undefined, 'section business-task');
     card.dataset.open = String(task.id === activeTaskID);
+    card.classList.add('clickable-card');
+    const activate = () => { if (!busy) card.querySelector('.buttons a, .buttons button')?.click(); };
+    card.addEventListener('click', event => { if (!event.target.closest('a,button,input,select') && !window.getSelection().toString()) activate(); });
     card.append(node('h3', task.title || `Задача №${task.id}`), node('p', task.company || 'Компания не указана', 'hint'),
       node('p', task.status === 'published' ? 'Опубликована' : 'Черновик', 'badge'),
       node('p', `${task.score} / 100 · ${task.level_label}`),
       node('p', `Откликов: ${task.proposals} (ожидают: ${task.pending}, принято: ${task.accepted}, отклонено: ${task.rejected})`));
+    if (task.reward) card.append(node('p', `${task.reward} · Бонус +${task.bonus}`, 'reward-note'));
     const actions = node('div', undefined, 'buttons');
     if (task.status === 'draft') {
       const edit = node('a', 'Доработать', 'text-link'); edit.href = `index.html?id=${task.id}`; actions.append(edit);
@@ -51,7 +54,7 @@ function renderTasks() {
 
 async function loadTasks() {
   try {
-    tasks = await request(`/api/business/tasks?company=${encodeURIComponent($('#company').value)}`);
+    tasks = await request('/api/business/tasks');
     if (activeTaskID && !tasks.some(task => task.id === activeTaskID && task.status === 'published')) {
       activeTaskID = null; $('#proposals-panel').hidden = true;
     }
@@ -89,10 +92,10 @@ function renderProposals(proposals) {
     details.append(prototype); card.append(details);
     if (proposal.status === 'pending') {
       const actions = node('div', undefined, 'buttons');
-      for (const [status, label] of [['accepted', 'Принять'], ['rejected', 'Отклонить']]) {
+      for (const [status, label] of [['accepted', 'Выбрать команду'], ['rejected', 'Отклонить']]) {
         const button = node('button', label, status === 'accepted' ? 'primary' : 'secondary'); button.type = 'button'; button.disabled = busy;
         button.addEventListener('click', () => {
-          if (busy || !window.confirm(`${label} предложение команды «${name}»?`)) return;
+          if (busy || !window.confirm(status === 'accepted' ? `Выбрать команду «${name}» для этой задачи?` : `Отклонить предложение команды «${name}»?`)) return;
           changeProposal(proposal.id, 'decision', { status });
         }); actions.append(button);
       }
@@ -149,23 +152,10 @@ async function changeProposal(id, action, body) {
 }
 
 async function initialise() {
-  const [companies, labels] = await Promise.all([request('/api/business/companies'), request('/api/categories')]);
-  categories = labels;
-  let company = $('#company').value;
-  try { company = sessionStorage.getItem(COMPANY_KEY) || ''; }
-  catch { $('#storage-note').textContent = 'Не удалось восстановить выбранную компанию. Выберите её в списке.'; }
-  $('#company').replaceChildren(new Option('Все компании', ''));
-  for (const item of companies) $('#company').append(new Option(item, item));
-  if (company && !companies.includes(company)) $('#company').append(new Option(company, company));
-  $('#company').value = company;
+  const session = await TaskLab.ready;
+  $('#company-name').textContent = session.company;
+  categories = await request('/api/categories');
   await loadTasks(); await loadPanel();
 }
-
-$('#company').addEventListener('change', () => operation(async () => {
-  try { sessionStorage.setItem(COMPANY_KEY, $('#company').value); $('#storage-note').textContent = ''; }
-  catch { $('#storage-note').textContent = 'Не удалось сохранить выбор компании. Фильтр действует до обновления страницы.'; }
-  activeTaskID = null; $('#proposals-panel').hidden = true; $('#proposal-list').replaceChildren();
-  await loadTasks();
-}));
 $('#refresh').addEventListener('click', () => operation(initialise));
 operation(initialise);

@@ -1,23 +1,17 @@
 'use strict';
 const { request, node } = window.TaskLab;
 const $ = selector => document.querySelector(selector);
-const ROLE_KEY = 'tasklab-role';
-const TEAM_KEY = 'tasklab-selected-team';
 const page = document.body.dataset.page;
 
-function saveSelection(key, value) {
-  try { sessionStorage.setItem(key, String(value)); }
-  catch { throw new Error('Не удалось сохранить выбранную роль или команду в браузере.'); }
-}
-
 if (page === 'login') {
-  $('#auth-form').addEventListener('submit', event => {
+  $('#auth-form').addEventListener('submit', async event => {
     event.preventDefault();
     try {
       const role = event.currentTarget.elements.role.value;
-      saveSelection(ROLE_KEY, role);
+      const button = event.currentTarget.querySelector('button[type=submit]'); button.disabled = true;
+      await request('/api/session', { method: 'POST', body: JSON.stringify({ role }) });
       location.href = role === 'business' ? '/static/task-builder/business.html' : '/static/task-builder/teams.html';
-    } catch (error) { $('#auth-error').textContent = error.message; }
+    } catch (error) { $('#auth-error').textContent = error.message; $('#auth-form button[type=submit]').disabled = false; }
   });
 }
 
@@ -32,25 +26,32 @@ async function initTeams() {
     $('#team-message').textContent = text;
     $('#team-message').classList.toggle('success', success);
   };
-  try { selected = Number(sessionStorage.getItem(TEAM_KEY)) || null; }
-  catch { message('Выбранная команда недоступна в памяти браузера. Выберите её повторно.'); }
+  try { const session = await TaskLab.ready; selected = session.team_id || null; }
+  catch (error) { message(error.message); return; }
 
-  function selectTeam(team) {
+  async function selectTeam(team) {
+    if (busy || selected) return;
+    if (!window.confirm(`Вступить в команду «${team.name}»? После подтверждения смена команды недоступна.`)) return;
+    busy = true; render();
     try {
-      saveSelection(ROLE_KEY, 'student');
-      saveSelection(TEAM_KEY, team.id);
-      selected = team.id;
+      TaskLab.session = await request('/api/session/team', { method:'POST', body:JSON.stringify({team_id:team.id}) });
+      selected = TaskLab.session.team_id;
       render();
-      message(`Выбрана команда «${team.name}». Это выбор роли для работы в MVP, без учёта участников.`, true);
-      document.dispatchEvent(new CustomEvent('team:selected', { detail: team }));
+      message(`Вы состоите в команде «${team.name}».`, true);
+      document.dispatchEvent(new CustomEvent('team:selected', {detail:team}));
     } catch (error) { message(error.message); }
+    finally { busy = false; render(); }
   }
 
   function render() {
+    $('#open-create').hidden = Boolean(selected);
+    $('.team-tools').hidden = Boolean(selected);
+    document.querySelector('.page-heading h1').textContent = selected ? 'Ваша команда' : 'Выберите свою команду';
+    document.querySelector('.page-heading p').textContent = selected ? 'Ваши навыки, интересы и баллы за подтверждённые этапы.' : 'Вступите в одну команду или создайте свою. После вступления смена команды недоступна.';
+    document.querySelector('.demo-note').hidden = Boolean(selected);
     const query = $('#search').value.trim().toLocaleLowerCase('ru');
     const category = $('#category-filter').value;
-    const filtered = teams.filter(team => (!category || team.interests.includes(category))
-      && `${team.name} ${team.skills} ${team.tech}`.toLocaleLowerCase('ru').includes(query));
+    const filtered = teams.filter(team => selected ? team.id === selected : (!category || team.interests.includes(category)) && `${team.name} ${team.skills} ${team.tech}`.toLocaleLowerCase('ru').includes(query));
     const grid = $('#team-grid');
     grid.replaceChildren();
     $('#team-count').textContent = `Команд: ${filtered.length}`;
@@ -61,7 +62,7 @@ async function initTeams() {
       for (const code of team.interests) tags.append(node('span', categories.find(c => c.code === code)?.label || code, 'tag'));
       const choose = node('button', selected === team.id ? 'Команда выбрана' : 'Выбрать команду', 'primary');
       choose.type = 'button';
-      choose.disabled = selected === team.id;
+      choose.disabled = busy || Boolean(selected);
       choose.addEventListener('click', () => selectTeam(team));
       card.append(node('div', team.name.slice(0, 2).toUpperCase(), 'team-icon'), node('h3', team.name),
         node('p', `Навыки: ${team.skills || 'Не указаны'}`), node('p', `Технологии: ${team.tech || 'Не указаны'}`),
@@ -73,15 +74,9 @@ async function initTeams() {
     panel.replaceChildren();
     if (!team) panel.append(node('p', 'Выберите команду из базы или создайте новую.'));
     else {
-      const clear = node('button', 'Сбросить выбор', 'secondary');
-      clear.type = 'button';
-      clear.addEventListener('click', () => {
-        try { sessionStorage.removeItem(TEAM_KEY); selected = null; render(); document.dispatchEvent(new CustomEvent('team:selected')); }
-        catch { message('Не удалось сбросить выбор команды.'); }
-      });
       const catalog = node('a', 'Перейти к задачам →', 'text-link');
       catalog.href = '/';
-      panel.append(node('h3', team.name), node('p', `Баллы: ${team.points}`), catalog, node('p'), clear);
+      panel.append(node('h3', team.name), node('p', `Баллы: ${team.points}`), catalog, node('p', 'Команда закреплена за вами. Смена команды недоступна.', 'hint'));
     }
   }
 
@@ -89,6 +84,7 @@ async function initTeams() {
     $('#open-create').disabled = true;
     message('Загружаем команды из базы…');
     try {
+      TaskLab.session = await request('/api/session'); selected = TaskLab.session.team_id || null;
       [teams, categories] = await Promise.all([request('/api/teams'), request('/api/categories')]);
       const filter = $('#category-filter');
       filter.replaceChildren(new Option('Все интересы', ''));
@@ -122,7 +118,9 @@ async function initTeams() {
     $('#create-error').textContent = 'Сохраняем команду…';
     try {
       const team = await request('/api/teams', { method: 'POST', body: JSON.stringify(body) });
-      teams.push(team); $('#create-dialog').close(); selectTeam(team);
+      teams.push(team); selected = team.id; TaskLab.session.team_id = team.id;
+      $('#create-dialog').close(); render(); message('Команда создана и закреплена за вами.', true);
+      document.dispatchEvent(new CustomEvent('team:selected', {detail:team}));
     } catch (error) { $('#create-error').textContent = error.message; }
     finally { busy = false; button.disabled = false; }
   });

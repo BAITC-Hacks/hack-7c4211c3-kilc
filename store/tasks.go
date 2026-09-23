@@ -19,6 +19,7 @@ type QA struct {
 }
 
 type Task struct {
+	Bonus             int
 	ID                int64
 	Company           string
 	Title             string
@@ -80,7 +81,7 @@ func isConfirmable(key string) bool {
 
 const taskColumns = `id, company, title, industry, category, draft_text, qa,
 	context, need, users, data, constraints, expected_result, success_criteria,
-	contact, interaction_format, reward_type, reward, confirmed, status, score, created_at, published_at`
+	contact, interaction_format, reward_type, reward, bonus, confirmed, status, score, created_at, published_at`
 
 func (t Task) Card() rating.Card {
 	confirmed := make(map[string]bool, len(t.Confirmed))
@@ -170,17 +171,22 @@ func publicationError(t Task) error {
 }
 
 func validateTask(t *Task) error {
+	t.Reward = strings.TrimSpace(t.Reward)
+	if !rating.ValidRewardType(t.RewardType) {
+		return &ValidationError{Field: "reward_type", Message: "Неизвестный тип вознаграждения"}
+	}
+	if len([]rune(t.Reward)) > 300 {
+		return &ValidationError{Field: "reward", Message: "Описание вознаграждения: не более 300 символов"}
+	}
+	if (t.Reward == "") != (t.RewardType == "") {
+		return &ValidationError{Field: "reward", Message: "Укажите тип и описание вознаграждения вместе"}
+	}
+
 	if strings.TrimSpace(t.DraftText) == "" {
 		return &ValidationError{Field: "draft_text", Message: "исходное описание задачи не может быть пустым"}
 	}
 	if !ValidCategory(t.Category) {
 		return &ValidationError{Field: "category", Message: "неизвестная категория «" + t.Category + "»"}
-	}
-	if !rating.ValidRewardType(t.RewardType) {
-		return &ValidationError{Field: "reward_type", Message: "неизвестный тип вознаграждения «" + t.RewardType + "»"}
-	}
-	if len([]rune(t.Reward)) > 300 {
-		return &ValidationError{Field: "reward", Message: "описание вознаграждения не должно превышать 300 символов"}
 	}
 	seen := make(map[string]bool, len(t.Confirmed))
 	confirmed := make([]string, 0, len(t.Confirmed))
@@ -234,18 +240,19 @@ func (s *Store) CreateTask(ctx context.Context, t *Task) error {
 		return err
 	}
 	t.Status = StatusDraft
-	t.Score = rating.Score(t.Card()).Total
+	result := rating.Score(t.Card())
+	t.Score, t.Bonus = result.Total, result.Bonus
 	t.CreatedAt = time.Now().UTC().Truncate(time.Second)
 	t.PublishedAt = time.Time{}
 
 	res, err := s.DB.ExecContext(ctx, `INSERT INTO tasks (
 		company, title, industry, category, draft_text, qa,
 		context, need, users, data, constraints, expected_result, success_criteria,
-		contact, interaction_format, reward_type, reward, confirmed, status, score, created_at
-	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		contact, interaction_format, reward_type, reward, bonus, confirmed, status, score, created_at
+	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		t.Company, t.Title, t.Industry, t.Category, t.DraftText, qa,
 		t.Context, t.Need, t.Users, t.Data, t.Constraints, t.ExpectedResult, t.SuccessCriteria,
-		t.Contact, t.InteractionFormat, t.RewardType, t.Reward, confirmed, t.Status, t.Score, formatTime(t.CreatedAt))
+		t.Contact, t.InteractionFormat, t.RewardType, t.Reward, t.Bonus, confirmed, t.Status, t.Score, formatTime(t.CreatedAt))
 	if err != nil {
 		return fmt.Errorf("создать задачу: %w", err)
 	}
@@ -286,7 +293,8 @@ func (s *Store) UpdateTask(ctx context.Context, t *Task) error {
 	if err != nil {
 		return err
 	}
-	t.Score = rating.Score(t.Card()).Total
+	result := rating.Score(t.Card())
+	t.Score, t.Bonus = result.Total, result.Bonus
 	t.Status = stored.Status
 	t.CreatedAt = stored.CreatedAt
 	t.PublishedAt = stored.PublishedAt
@@ -302,12 +310,12 @@ func (s *Store) UpdateTask(ctx context.Context, t *Task) error {
 	_, err = tx.ExecContext(ctx, `UPDATE tasks SET
 		company = ?, title = ?, industry = ?, category = ?, qa = ?,
 		context = ?, need = ?, users = ?, data = ?, constraints = ?, expected_result = ?,
-		success_criteria = ?, contact = ?, interaction_format = ?, reward_type = ?, reward = ?, confirmed = ?, score = ?,
+		success_criteria = ?, contact = ?, interaction_format = ?, reward_type = ?, reward = ?, bonus = ?, confirmed = ?, score = ?,
 		status = ?, published_at = ?
 		WHERE id = ?`,
 		t.Company, t.Title, t.Industry, t.Category, qa,
 		t.Context, t.Need, t.Users, t.Data, t.Constraints, t.ExpectedResult,
-		t.SuccessCriteria, t.Contact, t.InteractionFormat, t.RewardType, t.Reward, confirmed, t.Score,
+		t.SuccessCriteria, t.Contact, t.InteractionFormat, t.RewardType, t.Reward, t.Bonus, confirmed, t.Score,
 		t.Status, publishedAt, t.ID)
 	if err != nil {
 		return fmt.Errorf("обновить задачу %d: %w", t.ID, err)
@@ -328,7 +336,7 @@ func scanTask(row rowScanner) (Task, error) {
 	var publishedAt sql.NullString
 	err := row.Scan(&t.ID, &t.Company, &t.Title, &t.Industry, &t.Category, &t.DraftText, &qa,
 		&t.Context, &t.Need, &t.Users, &t.Data, &t.Constraints, &t.ExpectedResult, &t.SuccessCriteria,
-		&t.Contact, &t.InteractionFormat, &t.RewardType, &t.Reward, &confirmed, &t.Status, &t.Score, &createdAt, &publishedAt)
+		&t.Contact, &t.InteractionFormat, &t.RewardType, &t.Reward, &t.Bonus, &confirmed, &t.Status, &t.Score, &createdAt, &publishedAt)
 	if err != nil {
 		return Task{}, err
 	}
@@ -404,7 +412,7 @@ func (s *Store) ListCatalog(ctx context.Context, f CatalogFilter) ([]Task, error
 		query += ` AND score BETWEEN ? AND ?`
 		args = append(args, min, max)
 	}
-	query += ` ORDER BY score DESC, published_at DESC, id DESC`
+	query += ` ORDER BY (score + bonus) DESC, score DESC, published_at DESC, id DESC`
 
 	rows, err := s.DB.QueryContext(ctx, query, args...)
 	if err != nil {

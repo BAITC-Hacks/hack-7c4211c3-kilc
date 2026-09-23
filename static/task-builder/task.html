@@ -2,11 +2,10 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Задача — TaskLab</title><link rel="stylesheet" href="/static/task-builder/account.css"><script src="/static/nav.js" defer></script>
-  <script src="/static/task-builder/client.js" defer></script><script src="/static/task-builder/task.js" defer></script>
-</head>
+  <title>Задача — TaskLab</title><link rel="stylesheet" href="/static/task-builder/account.css"><script src="/static/task-builder/client.js" defer></script><script src="/static/nav.js" defer></script><script src="/static/chat.js" defer></script><script src="/static/task-builder/task.js" defer></script>
+<link rel="stylesheet" href="/static/chat.css"></head>
 <body>
-  <header class="topbar"><a class="brand" href="/">◈ TaskLab</a><nav class="nav" aria-label="Основная навигация"><a href="/">Каталог</a><a href="/static/task-builder/index.html">Новая задача</a><a href="/static/task-builder/teams.html">Команды</a><a href="/static/task-builder/business.html">Кабинет бизнеса</a><a href="/static/task-builder/login.html" data-role-link>Роль: не выбрана</a></nav></header>
+  <header class="topbar"><a class="brand" href="/">◈ TaskLab</a><nav class="nav" aria-label="Основная навигация"><span class="hint">Загрузка…</span></nav><span id="session-badge" class="session-badge"></span></header>
   <main>
     <p id="page-message" class="message" role="status">Загружаем задачу…</p>
     <div id="task-page" hidden>
