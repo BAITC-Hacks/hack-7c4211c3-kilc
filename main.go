@@ -63,6 +63,7 @@ func main() {
 		}
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	})
+	mux.HandleFunc("POST /api/rating", api.Rating)
 
 	addr := ":" + port
 	log.Printf("слушаю %s, база %s", addr, dbPath)
