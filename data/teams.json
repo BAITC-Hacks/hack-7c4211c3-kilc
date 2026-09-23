@@ -1,0 +1,7 @@
+[
+  {"key": "team_byte", "name": "Байт Батыры", "interests": ["crm", "web_app"], "skills": "Бэкенд, проектирование баз данных, интерфейсы", "tech": "Go, PostgreSQL, HTMX"},
+  {"key": "team_data", "name": "Дата Дала", "interests": ["analytics", "integration"], "skills": "Анализ данных, дашборды, ETL", "tech": "Python, pandas, Metabase"},
+  {"key": "team_bot", "name": "Шапағат Ботс", "interests": ["ai_assistant", "automation"], "skills": "Чат-боты, интеграция с мессенджерами", "tech": "Python, aiogram, FastAPI"},
+  {"key": "team_web", "name": "Көкжиек Веб", "interests": ["web_app", "content"], "skills": "Фронтенд, адаптивная вёрстка, UX", "tech": "TypeScript, React, Figma"},
+  {"key": "team_link", "name": "Интегра", "interests": ["integration", "automation", "crm"], "skills": "Интеграции по API, обмен файлами, очереди", "tech": "Java, Spring, RabbitMQ"}
+]

@@ -36,7 +36,7 @@ migration tool, or a JS toolchain.
 - `api/` — HTTP handlers.
 - `templates/`, `static/` — UI, embedded.
 - `data/` — seed fixtures.
-- `schema.sql`, `seed.sql`
+- `schema.sql`; seed fixtures are `data/*.json`
 - `PROGRESS.md`, `COMMITS.md` — do not edit unless asked.
 
 ## Rules
