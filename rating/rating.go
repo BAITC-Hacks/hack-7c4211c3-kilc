@@ -73,6 +73,21 @@ func Score(c Card) Result {
 	result.Hints = hints
 	result.Level = LevelFor(result.Total)
 	result.LevelLabel = levelLabel(result.Level)
+	trimmedReward := strings.TrimSpace(c.Reward.Text)
+	rewardType, knownRewardType := rewardTypeFor(c.RewardType)
+	if ValidRewardType(c.RewardType) && c.RewardType != "" && trimmedReward != "" && c.Reward.Confirmed {
+		result.Bonus = RewardBonus(c.RewardType)
+		result.BonusLabel = rewardType.Label
+	}
+	result.Position = result.Total + result.Bonus
+	switch {
+	case c.RewardType == "" || !knownRewardType || trimmedReward == "":
+		result.BonusHint = "Укажите вознаграждение для команды — до +10 к позиции в каталоге"
+	case !c.Reward.Confirmed:
+		result.BonusHint = "Подтвердите вознаграждение (+" + strconv.Itoa(rewardType.Bonus) + " к позиции в каталоге)"
+	case c.RewardType == "nonmonetary":
+		result.BonusHint = "Денежное вознаграждение или оплачиваемая стажировка дали бы +10 к позиции"
+	}
 	return result
 }
 
