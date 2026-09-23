@@ -96,7 +96,7 @@ func TestBusinessTaskOrderAndZeroCounts(t *testing.T) {
 	ctx := context.Background()
 	var ids []int64
 	for _, status := range []string{StatusPublished, StatusDraft, StatusPublished} {
-		task := Task{Title: "Task", DraftText: "Draft", Company: "Same"}
+		task := Task{Title: "Task", DraftText: "Draft", Company: "Same", Confirmed: []string{FieldTitle}}
 		if err := s.CreateTask(ctx, &task); err != nil {
 			t.Fatal(err)
 		}
