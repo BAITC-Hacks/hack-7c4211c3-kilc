@@ -35,6 +35,8 @@ type Task struct {
 	SuccessCriteria   string
 	Contact           string
 	InteractionFormat string
+	RewardType        string
+	Reward            string
 	Confirmed         []string
 	Status            string
 	Score             int
@@ -63,11 +65,12 @@ var ratingFields = map[string]bool{
 	rating.FieldSuccessCriteria:   true,
 	rating.FieldContact:           true,
 	rating.FieldInteractionFormat: true,
+	rating.FieldReward:            true,
 }
 
 const taskColumns = `id, company, title, industry, category, draft_text, qa,
 	context, need, users, data, constraints, expected_result, success_criteria,
-	contact, interaction_format, confirmed, status, score, created_at, published_at`
+	contact, interaction_format, reward_type, reward, confirmed, status, score, created_at, published_at`
 
 func (t Task) Card() rating.Card {
 	confirmed := make(map[string]bool, len(t.Confirmed))
@@ -78,6 +81,8 @@ func (t Task) Card() rating.Card {
 		return rating.Field{Text: text, Confirmed: confirmed[key]}
 	}
 	return rating.Card{
+		RewardType:        t.RewardType,
+		Reward:            field(rating.FieldReward, t.Reward),
 		Context:           field(rating.FieldContext, t.Context),
 		Need:              field(rating.FieldNeed, t.Need),
 		Users:             field(rating.FieldUsers, t.Users),
@@ -92,6 +97,7 @@ func (t Task) Card() rating.Card {
 
 func (t Task) fieldTexts() map[string]string {
 	return map[string]string{
+		rating.FieldReward:            t.Reward,
 		rating.FieldContext:           t.Context,
 		rating.FieldNeed:              t.Need,
 		rating.FieldUsers:             t.Users,
@@ -110,6 +116,12 @@ func validateTask(t *Task) error {
 	}
 	if !ValidCategory(t.Category) {
 		return &ValidationError{Field: "category", Message: "неизвестная категория «" + t.Category + "»"}
+	}
+	if !rating.ValidRewardType(t.RewardType) {
+		return &ValidationError{Field: "reward_type", Message: "неизвестный тип вознаграждения «" + t.RewardType + "»"}
+	}
+	if len([]rune(t.Reward)) > 300 {
+		return &ValidationError{Field: "reward", Message: "описание вознаграждения не должно превышать 300 символов"}
 	}
 	seen := make(map[string]bool, len(t.Confirmed))
 	confirmed := make([]string, 0, len(t.Confirmed))
@@ -170,11 +182,11 @@ func (s *Store) CreateTask(ctx context.Context, t *Task) error {
 	res, err := s.DB.ExecContext(ctx, `INSERT INTO tasks (
 		company, title, industry, category, draft_text, qa,
 		context, need, users, data, constraints, expected_result, success_criteria,
-		contact, interaction_format, confirmed, status, score, created_at
-	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		contact, interaction_format, reward_type, reward, confirmed, status, score, created_at
+	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		t.Company, t.Title, t.Industry, t.Category, t.DraftText, qa,
 		t.Context, t.Need, t.Users, t.Data, t.Constraints, t.ExpectedResult, t.SuccessCriteria,
-		t.Contact, t.InteractionFormat, confirmed, t.Status, t.Score, formatTime(t.CreatedAt))
+		t.Contact, t.InteractionFormat, t.RewardType, t.Reward, confirmed, t.Status, t.Score, formatTime(t.CreatedAt))
 	if err != nil {
 		return fmt.Errorf("создать задачу: %w", err)
 	}
@@ -201,12 +213,12 @@ func (s *Store) UpdateTask(ctx context.Context, t *Task) error {
 	err = s.DB.QueryRowContext(ctx, `UPDATE tasks SET
 		company = ?, title = ?, industry = ?, category = ?, draft_text = ?, qa = ?,
 		context = ?, need = ?, users = ?, data = ?, constraints = ?, expected_result = ?,
-		success_criteria = ?, contact = ?, interaction_format = ?, confirmed = ?, score = ?
+		success_criteria = ?, contact = ?, interaction_format = ?, reward_type = ?, reward = ?, confirmed = ?, score = ?
 		WHERE id = ?
 		RETURNING status, created_at, published_at`,
 		t.Company, t.Title, t.Industry, t.Category, t.DraftText, qa,
 		t.Context, t.Need, t.Users, t.Data, t.Constraints, t.ExpectedResult,
-		t.SuccessCriteria, t.Contact, t.InteractionFormat, confirmed, t.Score,
+		t.SuccessCriteria, t.Contact, t.InteractionFormat, t.RewardType, t.Reward, confirmed, t.Score,
 		t.ID).Scan(&t.Status, &createdAt, &publishedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return ErrNotFound
@@ -236,7 +248,7 @@ func scanTask(row rowScanner) (Task, error) {
 	var publishedAt sql.NullString
 	err := row.Scan(&t.ID, &t.Company, &t.Title, &t.Industry, &t.Category, &t.DraftText, &qa,
 		&t.Context, &t.Need, &t.Users, &t.Data, &t.Constraints, &t.ExpectedResult, &t.SuccessCriteria,
-		&t.Contact, &t.InteractionFormat, &confirmed, &t.Status, &t.Score, &createdAt, &publishedAt)
+		&t.Contact, &t.InteractionFormat, &t.RewardType, &t.Reward, &confirmed, &t.Status, &t.Score, &createdAt, &publishedAt)
 	if err != nil {
 		return Task{}, err
 	}
@@ -286,7 +298,7 @@ func (s *Store) PublishTask(ctx context.Context, id int64) error {
 	for _, key := range []string{
 		rating.FieldContext, rating.FieldNeed, rating.FieldUsers, rating.FieldData,
 		rating.FieldConstraints, rating.FieldExpectedResult, rating.FieldSuccessCriteria,
-		rating.FieldContact, rating.FieldInteractionFormat,
+		rating.FieldContact, rating.FieldInteractionFormat, rating.FieldReward,
 	} {
 		if strings.TrimSpace(texts[key]) != "" && !confirmed[key] {
 			unconfirmed = append(unconfirmed, key)

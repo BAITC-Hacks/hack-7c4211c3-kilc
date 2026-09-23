@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -14,6 +15,37 @@ func loadSchema(t *testing.T) string {
 		t.Fatalf("read schema: %v", err)
 	}
 	return string(b)
+}
+
+func TestOpenUpgradesExistingTasksIdempotently(t *testing.T) {
+	legacy := strings.Replace(loadSchema(t), "    reward_type        TEXT    NOT NULL DEFAULT '',\n    reward             TEXT    NOT NULL DEFAULT '',\n", "", 1)
+	path := filepath.Join(t.TempDir(), "legacy.db")
+	s, err := Open(path, legacy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.DB.Exec(`INSERT INTO tasks (draft_text) VALUES ('preserved')`); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Close(); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 2; i++ {
+		s, err = Open(path, legacy)
+		if err != nil {
+			t.Fatalf("reopen #%d: %v", i+1, err)
+		}
+		var draft, rewardType, reward string
+		if err := s.DB.QueryRow(`SELECT draft_text, reward_type, reward FROM tasks`).Scan(&draft, &rewardType, &reward); err != nil {
+			t.Fatal(err)
+		}
+		if draft != "preserved" || rewardType != "" || reward != "" {
+			t.Fatalf("row after upgrade = %q %q %q", draft, rewardType, reward)
+		}
+		if err := s.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}
 }
 
 func TestOpenIdempotent(t *testing.T) {
