@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Задача — TaskLab</title><link rel="stylesheet" href="account.css">
+  <script src="client.js" defer></script><script src="task.js" defer></script>
+</head>
+<body>
+  <header class="topbar"><a class="brand" href="index.html">◈ TaskLab</a><nav class="nav" aria-label="Навигация"><a href="teams.html">Команды</a><a href="index.html">Конструктор задач</a><a href="login.html">Сменить роль</a></nav></header>
+  <main>
+    <p id="page-message" class="message" role="status">Загружаем задачу…</p>
+    <div id="task-page" hidden>
+      <div class="intro"><span class="eyebrow">ЗАДАЧА БИЗНЕСА</span><h1 id="task-title" style="overflow-wrap:anywhere"></h1><p id="task-meta"></p></div>
+      <div class="layout">
+        <section class="section preview" style="margin-top:0" aria-labelledby="card-heading"><h2 id="card-heading">Карточка задачи</h2><dl id="task-fields"></dl></section>
+        <aside><section class="score-card"><span class="eyebrow">ГОТОВНОСТЬ ЗАДАЧИ</span><div class="score"><strong id="task-score"></strong><span>/ 100</span></div><p id="task-level" class="badge"></p><p id="draft-note" class="hint" hidden>Требует уточнения</p><div id="task-components"></div><div class="next"><h3>Что можно уточнить</h3><ul id="task-hints" style="padding-left:18px;font-size:12px;line-height:1.7"></ul></div><p id="proposal-count" role="status">Откликов: …</p><p id="count-error" class="message" role="status"></p></section></aside>
+      </div>
+      <section id="proposal-section" class="section" aria-labelledby="proposal-heading" hidden>
+        <h2 id="proposal-heading">Предложите решение</h2><p class="hint">Опишите подход и план работы. Решение о сотрудничестве принимает бизнес.</p>
+        <p id="team-note" class="hint" role="status"></p>
+        <form id="proposal-form">
+          <p id="error-task_id" class="message" role="alert"></p>
+          <div class="field"><label for="team_id">Команда</label><select id="team_id" name="team_id" required aria-describedby="error-team_id"><option value="">Выберите команду</option></select><p id="error-team_id" class="message" role="alert"></p></div>
+          <div class="field"><label for="idea">Идея решения</label><textarea id="idea" name="idea" maxlength="4000" required aria-describedby="error-idea" placeholder="Как вы предлагаете решить задачу?"></textarea><p id="error-idea" class="message" role="alert"></p></div>
+          <div class="field"><label for="plan">План работы</label><textarea id="plan" name="plan" maxlength="4000" required aria-describedby="error-plan" placeholder="Основные этапы и результат каждого этапа"></textarea><p id="error-plan" class="message" role="alert"></p></div>
+          <div class="field"><label for="deadline">Срок выполнения</label><input id="deadline" name="deadline" type="date" required aria-describedby="error-deadline"><p id="error-deadline" class="message" role="alert"></p></div>
+          <div class="field"><label for="prototype_url">Ссылка на прототип</label><input id="prototype_url" name="prototype_url" type="url" maxlength="2000" required placeholder="https://example.com/prototype" aria-describedby="error-prototype_url"><p id="error-prototype_url" class="message" role="alert"></p></div>
+          <p id="proposal-message" class="message" role="status" aria-live="polite"></p>
+          <div class="buttons"><button id="submit-proposal" type="submit" class="primary">Отправить предложение</button></div>
+        </form>
+      </section>
+    </div>
+  </main>
+</body>
+</html>

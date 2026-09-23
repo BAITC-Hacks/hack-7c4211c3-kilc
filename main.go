@@ -54,6 +54,8 @@ func main() {
 
 	mux := http.NewServeMux()
 	api.RegisterFrontend(mux, st)
+	api.RegisterProposals(mux, st)
+	api.RegisterBusiness(mux, st)
 	api.RegisterRecommendations(mux, st)
 	mux.HandleFunc("GET /{$}", api.Catalog(st, tpl))
 	mux.Handle("GET /static/", http.FileServerFS(assets))
