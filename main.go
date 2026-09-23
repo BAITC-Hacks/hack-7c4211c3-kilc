@@ -1,8 +1,11 @@
 package main
 
 import (
-	_ "embed"
+	"context"
+	"embed"
 	"encoding/json"
+	"errors"
+	"io/fs"
 	"log"
 	"net/http"
 	"os"
@@ -13,6 +16,9 @@ import (
 //go:embed schema.sql
 var schema string
 
+//go:embed data/*.json
+var seedFiles embed.FS
+
 func main() {
 	port := envOr("PORT", "8080")
 	dbPath := envOr("DB_PATH", "data.db")
@@ -22,6 +28,19 @@ func main() {
 		log.Fatalf("старт: %v", err)
 	}
 	defer st.Close()
+
+	fixtures, err := fs.Sub(seedFiles, "data")
+	if err != nil {
+		log.Fatalf("старт: открыть данные для seed: %v", err)
+	}
+	switch err := st.Seed(context.Background(), fixtures); {
+	case errors.Is(err, store.ErrSeedSkipped):
+		log.Print("seed skipped: database not empty")
+	case err != nil:
+		log.Fatalf("старт: seed: %v", err)
+	default:
+		log.Print("seeded")
+	}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
