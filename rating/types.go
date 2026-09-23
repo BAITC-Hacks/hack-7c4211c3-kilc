@@ -8,15 +8,17 @@ type Field struct {
 
 // Card contains the fields considered by the rating scorer.
 type Card struct {
-	Context           Field `json:"context"`
-	Need              Field `json:"need"`
-	Users             Field `json:"users"`
-	Data              Field `json:"data"`
-	Constraints       Field `json:"constraints"`
-	ExpectedResult    Field `json:"expected_result"`
-	SuccessCriteria   Field `json:"success_criteria"`
-	Contact           Field `json:"contact"`
-	InteractionFormat Field `json:"interaction_format"`
+	RewardType        string `json:"reward_type"`
+	Reward            Field  `json:"reward"`
+	Context           Field  `json:"context"`
+	Need              Field  `json:"need"`
+	Users             Field  `json:"users"`
+	Data              Field  `json:"data"`
+	Constraints       Field  `json:"constraints"`
+	ExpectedResult    Field  `json:"expected_result"`
+	SuccessCriteria   Field  `json:"success_criteria"`
+	Contact           Field  `json:"contact"`
+	InteractionFormat Field  `json:"interaction_format"`
 }
 
 const (
@@ -29,6 +31,7 @@ const (
 	FieldSuccessCriteria   = "success_criteria"
 	FieldContact           = "contact"
 	FieldInteractionFormat = "interaction_format"
+	FieldReward            = "reward"
 )
 
 const (
@@ -65,6 +68,10 @@ type Hint struct {
 // Result is the complete rating breakdown for a card.
 type Result struct {
 	Total      int         `json:"total"`
+	Bonus      int         `json:"bonus"`
+	BonusLabel string      `json:"bonus_label"`
+	BonusHint  string      `json:"bonus_hint"`
+	Position   int         `json:"position"`
 	Potential  int         `json:"potential"`
 	Level      string      `json:"level"`
 	LevelLabel string      `json:"level_label"`

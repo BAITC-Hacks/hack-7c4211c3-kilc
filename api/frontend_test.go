@@ -75,3 +75,25 @@ func TestFrontendPersistence(t *testing.T) {
 	call("GET", "/api/tasks/99999", "", 404)
 	call("GET", "/api/tasks?level=unknown", "", 400)
 }
+
+func TestRewardTypesEndpoint(t *testing.T) {
+	mux := http.NewServeMux()
+	RegisterRewardTypes(mux)
+	r := httptest.NewRequest(http.MethodGet, "/api/reward-types", nil)
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, r)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200: %s", w.Code, w.Body.String())
+	}
+	var items []struct {
+		Code  string `json:"code"`
+		Label string `json:"label"`
+		Bonus int    `json:"bonus"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &items); err != nil {
+		t.Fatal(err)
+	}
+	if len(items) != 4 || items[0].Code != "" {
+		t.Fatalf("reward types = %+v, want 4 items beginning with empty code", items)
+	}
+}

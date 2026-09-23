@@ -22,6 +22,7 @@ const { request, node } = window.TaskLab;
 const form = document.querySelector('#task-form');
 const $ = selector => document.querySelector(selector);
 const ratingFields = ['context', 'need', 'users', 'data', 'constraints', 'expected_result', 'success_criteria', 'contact', 'interaction_format'];
+const confirmableFields = [...ratingFields, 'reward'];
 const confirmed = new Set();
 const DRAFT_KEY = 'tasklab-server-draft-v1';
 let taskId = null;
@@ -52,8 +53,8 @@ for (const field of fields) {
   $(`#${field.group}-fields`).append(wrapper);
 }
 
-function values() { return Object.fromEntries(fields.map(field => [field.id, form.elements[field.id].value.trim()])); }
-function payload() { return { ...values(), qa, confirmed: [...confirmed] }; }
+function values() { return { ...Object.fromEntries(fields.map(field => [field.id, form.elements[field.id].value.trim()])), reward: form.elements.reward.value.trim(), reward_type: form.elements.reward_type.value }; }
+function payload() { const data = values(); return { ...data, reward_type: data.reward_type, reward: data.reward, qa, confirmed: [...confirmed] }; }
 function setStatus(text) { $('#save-status').textContent = text; }
 function lock(locked) {
   busy = locked;
@@ -66,7 +67,7 @@ function updateChecks() {
     check.checked = confirmed.has(check.dataset.confirm);
     check.disabled = busy || !data[check.dataset.confirm];
   }
-  const filled = ratingFields.filter(key => data[key]);
+  const filled = confirmableFields.filter(key => data[key]);
   $('#confirmed').checked = filled.length > 0 && filled.every(key => confirmed.has(key));
   $('#confirmed').indeterminate = !$('#confirmed').checked && filled.some(key => confirmed.has(key));
 }
@@ -83,17 +84,24 @@ function showRating(result) {
   $('#next-tip').replaceChildren();
   if (!result.hints.length) $('#next-tip').textContent = 'Все поля заполнены и подтверждены.';
   for (const hint of result.hints) $('#next-tip').append(node('span', hint.message), node('br'));
+  $('#bonus').textContent = `+${result.bonus ?? 0}`;
+  $('#position').textContent = result.position ?? result.total;
+  $('#bonus-hint').textContent = result.bonus_hint || '';
+  $('#bonus-hint').hidden = !result.bonus_hint;
 }
 function invalidateRating() {
   revision++; clearTimeout(timer);
   $('#score').textContent = '…'; $('#progress').value = 0; $('#level').textContent = 'Пересчёт';
   $('#score-state').textContent = 'Запрос к серверу'; $('#breakdown').replaceChildren();
+  $('#bonus').textContent = '+0'; $('#position').textContent = '—'; $('#bonus-hint').textContent = ''; $('#bonus-hint').hidden = true;
   timer = setTimeout(refreshRating, 300);
 }
 async function refreshRating() {
   const version = revision;
   const data = values();
   const card = Object.fromEntries(ratingFields.map(key => [key, { text: data[key], confirmed: confirmed.has(key) }]));
+  card.reward_type = data.reward_type;
+  card.reward = { text: data.reward, confirmed: confirmed.has('reward') };
   try {
     const result = await request('/api/rating', { method: 'POST', body: JSON.stringify(card) });
     if (version === revision) showRating(result);
@@ -116,9 +124,9 @@ form.addEventListener('input', event => {
     else confirmed.delete(target.dataset.confirm);
   } else if (target.id === 'confirmed') {
     confirmed.clear();
-    if (target.checked) for (const key of ratingFields) if (values()[key]) confirmed.add(key);
+    if (target.checked) for (const key of confirmableFields) if (values()[key]) confirmed.add(key);
   } else {
-    confirmed.delete(target.name); saveLocalDraft();
+    confirmed.delete(target.id === 'reward_type' ? 'reward' : target.name); saveLocalDraft();
   }
   currentTask = null; $('#preview').hidden = true;
   if (taskId) setStatus('Есть несохранённые изменения.');
@@ -140,7 +148,7 @@ async function save(publish) {
   if (busy || !form.reportValidity()) return;
   const body = payload();
   if (!body.draft_text) { setStatus('Введите исходное описание задачи.'); form.elements.draft_text.focus(); return; }
-  if (publish && (!body.title || ratingFields.some(key => body[key] && !confirmed.has(key)))) {
+  if (publish && (!body.title || confirmableFields.some(key => body[key] && !confirmed.has(key)))) {
     setStatus('Для публикации укажите название и подтвердите все заполненные поля.'); return;
   }
   clearTimeout(timer); revision++; lock(true); setStatus('Сохраняем в базе…');
@@ -185,19 +193,27 @@ async function init() {
     const categories = await request('/api/categories');
     form.elements.category.append(new Option('Не выбрана', ''));
     for (const category of categories) form.elements.category.append(new Option(category.label, category.code));
+    const rewardTypes = await request('/api/reward-types');
+    form.elements.reward_type.replaceChildren();
+    for (const rewardType of rewardTypes) form.elements.reward_type.append(new Option(rewardType.label, rewardType.code));
     if (requestedID) {
       if (!/^[1-9]\d*$/.test(requestedID)) throw new Error('Некорректный ID задачи в адресе.');
       const task = await request(`/api/tasks/${requestedID}`);
       taskId = task.id; qa = task.qa || [];
       for (const field of fields) form.elements[field.id].value = task[field.id] || '';
+      form.elements.reward.value = task.reward || '';
+      form.elements.reward_type.value = task.reward_type || '';
       for (const key of task.confirmed) confirmed.add(key);
       preview(task); setStatus(`Загружена задача №${taskId}.`);
     } else {
+      form.elements.reward_type.value = '';
       try {
         const draft = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null');
         if (draft && typeof draft === 'object') for (const field of fields) {
           if (typeof draft[field.id] === 'string') form.elements[field.id].value = draft[field.id].slice(0, field.max || 100);
         }
+        if (draft && typeof draft.reward === 'string') form.elements.reward.value = draft.reward.slice(0, 300);
+        if (draft && typeof draft.reward_type === 'string') form.elements.reward_type.value = draft.reward_type;
       } catch { setStatus('Не удалось восстановить локальный черновик. Заполните поля заново.'); }
     }
     lock(false); updateChecks(); await refreshRating();
