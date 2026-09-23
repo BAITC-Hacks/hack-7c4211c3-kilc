@@ -1,5 +1,5 @@
 {{define "content"}}
-<section id="recommendations" hidden aria-live="polite"></section>
+<section id="recommendations" class="recommendations" hidden aria-live="polite"></section>
 <script src="/static/recommend.js" defer></script>
 <form class="catalog-filters" method="get" action="/">
   <label>Категория
@@ -20,10 +20,10 @@
       {{range .Levels}}<option value="{{.Code}}"{{if eq $.Level .Code}} selected{{end}}>{{.Label}} ({{.Min}}–{{.Max}})</option>{{end}}
     </select>
   </label>
-  <button type="submit">Показать</button>
+  <button type="submit" class="primary">Показать</button>
   <a href="/">Сбросить</a>
 </form>
-{{if .Error}}<p class="filter-error">{{.Error}}</p>{{end}}
+{{if .Error}}<p class="filter-error" role="alert">{{.Error}}</p>{{end}}
 <p class="catalog-count">Найдено задач: {{.Count}} · сортировка по рейтингу</p>
 {{if .Cards}}
 <div class="catalog">

@@ -16,7 +16,7 @@ if (page === 'login' || page === 'register') {
     try {
       const role = event.currentTarget.elements.role.value;
       saveSelection(ROLE_KEY, role);
-      location.href = role === 'business' ? 'index.html' : 'teams.html';
+      location.href = role === 'business' ? 'business.html' : 'teams.html';
     } catch (error) { $('#auth-error').textContent = error.message; }
   });
 }
@@ -76,10 +76,12 @@ async function initTeams() {
       const clear = node('button', 'Сбросить выбор', 'secondary');
       clear.type = 'button';
       clear.addEventListener('click', () => {
-        try { sessionStorage.removeItem(TEAM_KEY); selected = null; render(); }
+        try { sessionStorage.removeItem(TEAM_KEY); selected = null; render(); document.dispatchEvent(new CustomEvent('team:selected')); }
         catch { message('Не удалось сбросить выбор команды.'); }
       });
-      panel.append(node('h3', team.name), node('p', `ID: ${team.id} · Баллы: ${team.points}`), clear);
+      const catalog = node('a', 'Перейти к задачам →', 'text-link');
+      catalog.href = '/';
+      panel.append(node('h3', team.name), node('p', `Баллы: ${team.points}`), catalog, node('p'), clear);
     }
   }
 
