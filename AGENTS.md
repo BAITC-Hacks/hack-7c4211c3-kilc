@@ -59,12 +59,24 @@ migration tool, or a JS toolchain.
   constraints 10, users 10, business_contact 10.
 - Rating returns a breakdown per component plus a list of what is
   missing, never a bare number. Recalculated after every edit.
+- Only filled and confirmed fields score. Editing a field removes it
+  from `confirmed` until the user confirms it again.
 - Levels: 0-39 draft, 40-69 working, 70-89 ready, 90-100 priority.
+  Level is derived from score in Go, never stored.
 - A low rating never hides a task from the catalog and never blocks a
   proposal. All published tasks are visible to every team.
-- Catalog sorts by rating descending, with filters by industry and level.
+- Catalog sorts by rating descending, with filters by category, industry
+  and level (level filter is a score range).
+- Category is one code from the fixed list below. The AI may suggest a
+  category only from that list or leave it empty; the user confirms it.
+  Category does not affect the rating.
 - Team selection is manual only. No code path may set a proposal to
   accepted without an explicit user action. Never auto-assign.
+  The business may accept one, several or none.
+- Stage confirmation is a manual business action on an accepted
+  proposal only. It sets `stage_confirmed_at` and `points_awarded`.
+  Team points are `SUM(points_awarded)`, never stored on the team.
+- No personal or sensitive attributes of team members are stored.
 - The AI must not introduce facts the user did not supply. Validate that
   model output contains only keys from the schema; drop anything else.
 - Every AI-generated field is human-confirmed before publication.
@@ -85,13 +97,37 @@ fall back to the stub and log it. Never fabricate a successful result.
 ## Data model
 
 ```
-Task: id, title, context, need, users, data, constraints,
+Task: id, company, title, industry, category,
+      draft_text, qa(json [{field, question, answer}]),
+      context, need, users, data, constraints,
       expected_result, success_criteria, contact, interaction_format,
-      industry, status(draft|published), score, level, created_at
-Team: id, name, interests, skills, tech
-Proposal: id, task_id, team_id, idea, plan, deadline, prototype_url,
-          status(pending|accepted|rejected), created_at
+      confirmed(json list of field names),
+      status(draft|published), score, created_at, published_at
+Team: id, name, interests(json list of category codes), skills, tech
+Proposal: id, task_id, team_id, idea, plan, deadline(YYYY-MM-DD),
+          prototype_url, status(pending|accepted|rejected),
+          decided_at, stage_confirmed_at, points_awarded, created_at
 ```
+
+- `draft_text` is the original rough description, kept unchanged.
+- `qa` holds the clarifying questions and the user's answers.
+- `score` is stored for sorting and rewritten on every save.
+- `deadline` is required and must parse as a date; `prototype_url` is
+  required and must start with `http://` or `https://`.
+- Timestamps are `TEXT` in RFC 3339.
+
+Categories (store the code, show the label; enforce with `CHECK`):
+
+| Code | Label |
+|---|---|
+| `crm` | CRM и продажи |
+| `automation` | Автоматизация процессов и администрирование |
+| `analytics` | Аналитика и отчётность |
+| `ai_assistant` | Чат-бот / AI-ассистент |
+| `web_app` | Веб-сервис или приложение |
+| `integration` | Интеграция систем и данных |
+| `content` | Обучение и контент |
+| `other` | Другое |
 
 Role is a dropdown, not a user account: business or student team.
 
