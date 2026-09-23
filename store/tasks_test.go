@@ -66,6 +66,8 @@ func TestCreateTaskValidation(t *testing.T) {
 		{"empty draft", Task{DraftText: "  "}, "draft_text"},
 		{"bad category", Task{DraftText: "x", Category: "xyz"}, "category"},
 		{"bad confirmed", Task{DraftText: "x", Confirmed: []string{"budget"}}, "confirmed"},
+		{"bad reward type", Task{DraftText: "x", RewardType: "gold"}, "reward_type"},
+		{"long reward", Task{DraftText: "x", Reward: strings.Repeat("я", 301)}, "reward"},
 	}
 	for _, c := range cases {
 		err := s.CreateTask(context.Background(), &c.task)
@@ -73,6 +75,37 @@ func TestCreateTaskValidation(t *testing.T) {
 		if !errors.As(err, &ve) || ve.Field != c.field {
 			t.Errorf("%s: got %v, want ValidationError on %q", c.name, err, c.field)
 		}
+	}
+}
+
+func TestRewardPersistsAndDoesNotChangeCompletenessScore(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "task.db")
+	s, err := Open(path, loadSchema(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	task := Task{DraftText: "Нужна CRM", RewardType: "money", Reward: "Грант 300000 тенге", Confirmed: []string{rating.FieldReward}}
+	if err := s.CreateTask(ctx, &task); err != nil {
+		t.Fatal(err)
+	}
+	if task.Score != 0 || rating.Score(task.Card()).Bonus != 10 {
+		t.Fatalf("score=%d rating=%+v", task.Score, rating.Score(task.Card()))
+	}
+	if err := s.Close(); err != nil {
+		t.Fatal(err)
+	}
+	s, err = Open(path, loadSchema(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	got, err := s.GetTask(ctx, task.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.RewardType != "money" || got.Reward != task.Reward || got.Score != 0 || rating.Score(got.Card()).Bonus != 10 {
+		t.Fatalf("task=%+v rating=%+v", got, rating.Score(got.Card()))
 	}
 }
 
@@ -319,6 +352,35 @@ func TestUpdateTaskDropsChangedConfirmation(t *testing.T) {
 	}
 	if got.Score != 0 || len(got.Confirmed) != 0 {
 		t.Errorf("omitted confirmation kept: score %d confirmed %v", got.Score, got.Confirmed)
+	}
+}
+
+func TestUpdateTaskRewardTypeChangeDropsConfirmation(t *testing.T) {
+	s := openTestStore(t)
+	ctx := context.Background()
+	task := Task{DraftText: "Нужна CRM", RewardType: "money", Reward: "Грант 300000 тенге"}
+	if err := s.CreateTask(ctx, &task); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	task.Confirmed = []string{rating.FieldReward}
+	if err := s.UpdateTask(ctx, &task); err != nil {
+		t.Fatalf("confirm: %v", err)
+	}
+	if len(task.Confirmed) != 1 {
+		t.Fatalf("confirmed reward = %v, want [reward]", task.Confirmed)
+	}
+
+	task.RewardType = "internship"
+	task.Confirmed = []string{rating.FieldReward}
+	if err := s.UpdateTask(ctx, &task); err != nil {
+		t.Fatalf("change type: %v", err)
+	}
+	got, err := s.GetTask(ctx, task.ID)
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	if len(task.Confirmed) != 0 || len(got.Confirmed) != 0 || got.RewardType != "internship" {
+		t.Fatalf("changed reward type: returned %v, stored %v %q, want unconfirmed internship", task.Confirmed, got.Confirmed, got.RewardType)
 	}
 }
 

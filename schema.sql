@@ -17,6 +17,8 @@ CREATE TABLE IF NOT EXISTS tasks (
     success_criteria   TEXT    NOT NULL DEFAULT '',
     contact            TEXT    NOT NULL DEFAULT '',
     interaction_format TEXT    NOT NULL DEFAULT '',
+    reward_type        TEXT    NOT NULL DEFAULT '',
+    reward             TEXT    NOT NULL DEFAULT '',
     confirmed          TEXT    NOT NULL DEFAULT '[]',
     status             TEXT    NOT NULL DEFAULT 'draft'
         CHECK (status IN ('draft', 'published')),

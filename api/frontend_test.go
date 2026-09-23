@@ -47,11 +47,14 @@ func TestFrontendPersistence(t *testing.T) {
 	}
 	call("POST", "/api/teams", `{"name":"Bad","interests":["unknown"]}`, 400)
 	call("POST", "/api/teams", `{"name":"Bad","members":[]}`, 400)
-	body := `{"title":"Test task","draft_text":"Original draft","context":"The current business process is manual","category":"automation","confirmed":[]}`
+	body := `{"title":"Test task","draft_text":"Original draft","context":"The current business process is manual","category":"automation","reward_type":"","reward":"","confirmed":[]}`
 	w := call("POST", "/api/tasks", body, 201)
 	var task taskView
 	if err := json.Unmarshal(w.Body.Bytes(), &task); err != nil {
 		t.Fatal(err)
+	}
+	if task.RewardType != "" || task.Reward != "" {
+		t.Fatalf("reward fields = %q %q", task.RewardType, task.Reward)
 	}
 	path := "/api/tasks/" + strconv.FormatInt(task.ID, 10)
 	if task.Rating.Total != 0 || task.Rating.Potential != 10 {
@@ -97,11 +100,37 @@ func TestFrontendPersistence(t *testing.T) {
 		t.Fatalf("republished card missing from catalog: %+v", tasks)
 	}
 	body = changed
-	call("GET", path, "", 200)
+	w = call("GET", path, "", 200)
+	if err := json.Unmarshal(w.Body.Bytes(), &task); err != nil {
+		t.Fatal(err)
+	}
+	if task.RewardType != "" || task.Reward != "" {
+		t.Fatalf("GET reward fields = %q %q", task.RewardType, task.Reward)
+	}
 	call("PUT", path, strings.Replace(body, "Original draft", "Changed draft", 1), 400)
 	call("GET", "/api/tasks/nope", "", 400)
 	call("GET", "/api/tasks/99999", "", 404)
 	call("GET", "/api/tasks?level=unknown", "", 400)
+	call("POST", "/api/tasks", `{"draft_text":"Нужна CRM","reward_type":"unknown","reward":"","confirmed":[]}`, 400)
+	call("POST", "/api/tasks", `{"draft_text":"Нужна CRM","reward_type":"money","reward":"`+strings.Repeat("я", 301)+`","confirmed":[]}`, 400)
+	call("POST", "/api/tasks", `{"draft_text":"Нужна CRM","unexpected":true}`, 400)
+
+	bonusBody := `{"draft_text":"Нужна CRM","reward_type":"money","reward":"Грант 300000 тенге","confirmed":["reward"]}`
+	w = call("POST", "/api/tasks", bonusBody, 201)
+	if err := json.Unmarshal(w.Body.Bytes(), &task); err != nil {
+		t.Fatal(err)
+	}
+	if task.RewardType != "money" || task.Reward != "Грант 300000 тенге" || task.Rating.Bonus != 10 || task.Rating.Total != 0 {
+		t.Fatalf("reward task = %+v", task)
+	}
+	bonusPath := "/api/tasks/" + strconv.FormatInt(task.ID, 10)
+	w = call("GET", bonusPath, "", 200)
+	if err := json.Unmarshal(w.Body.Bytes(), &task); err != nil {
+		t.Fatal(err)
+	}
+	if task.RewardType != "money" || task.Reward != "Грант 300000 тенге" || task.Rating.Bonus != 10 || task.Rating.Total != 0 {
+		t.Fatalf("GET reward task = %+v", task)
+	}
 }
 
 func TestRewardTypesEndpoint(t *testing.T) {

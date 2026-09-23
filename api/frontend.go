@@ -69,13 +69,16 @@ type taskBody struct {
 	SuccessCriteria   string     `json:"success_criteria"`
 	Contact           string     `json:"contact"`
 	InteractionFormat string     `json:"interaction_format"`
+	RewardType        string     `json:"reward_type"`
+	Reward            string     `json:"reward"`
 	Confirmed         []string   `json:"confirmed"`
 }
 
 func (b taskBody) task() store.Task {
 	return store.Task{Company: b.Company, Title: b.Title, Industry: b.Industry, Category: b.Category, DraftText: b.DraftText, QA: b.QA,
 		Context: b.Context, Need: b.Need, Users: b.Users, Data: b.Data, Constraints: b.Constraints, ExpectedResult: b.ExpectedResult,
-		SuccessCriteria: b.SuccessCriteria, Contact: b.Contact, InteractionFormat: b.InteractionFormat, Confirmed: b.Confirmed}
+		SuccessCriteria: b.SuccessCriteria, Contact: b.Contact, InteractionFormat: b.InteractionFormat,
+		RewardType: b.RewardType, Reward: b.Reward, Confirmed: b.Confirmed}
 }
 
 type taskView struct {
@@ -86,7 +89,13 @@ type taskView struct {
 }
 
 func viewTask(t store.Task) taskView {
-	return taskView{t.ID, taskBody{t.Company, t.Title, t.Industry, t.Category, t.DraftText, t.QA, t.Context, t.Need, t.Users, t.Data, t.Constraints, t.ExpectedResult, t.SuccessCriteria, t.Contact, t.InteractionFormat, t.Confirmed}, t.Status, rating.Score(t.Card())}
+	return taskView{ID: t.ID, taskBody: taskBody{
+		Company: t.Company, Title: t.Title, Industry: t.Industry, Category: t.Category,
+		DraftText: t.DraftText, QA: t.QA, Context: t.Context, Need: t.Need, Users: t.Users,
+		Data: t.Data, Constraints: t.Constraints, ExpectedResult: t.ExpectedResult,
+		SuccessCriteria: t.SuccessCriteria, Contact: t.Contact, InteractionFormat: t.InteractionFormat,
+		RewardType: t.RewardType, Reward: t.Reward, Confirmed: t.Confirmed,
+	}, Status: t.Status, Rating: rating.Score(t.Card())}
 }
 
 func decodeFrontend(w http.ResponseWriter, r *http.Request, target any) bool {

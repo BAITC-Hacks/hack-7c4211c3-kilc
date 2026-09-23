@@ -35,6 +35,8 @@ type Task struct {
 	SuccessCriteria   string
 	Contact           string
 	InteractionFormat string
+	RewardType        string
+	Reward            string
 	Confirmed         []string
 	Status            string
 	Score             int
@@ -78,7 +80,7 @@ func isConfirmable(key string) bool {
 
 const taskColumns = `id, company, title, industry, category, draft_text, qa,
 	context, need, users, data, constraints, expected_result, success_criteria,
-	contact, interaction_format, confirmed, status, score, created_at, published_at`
+	contact, interaction_format, reward_type, reward, confirmed, status, score, created_at, published_at`
 
 func (t Task) Card() rating.Card {
 	confirmed := make(map[string]bool, len(t.Confirmed))
@@ -89,6 +91,8 @@ func (t Task) Card() rating.Card {
 		return rating.Field{Text: text, Confirmed: confirmed[key]}
 	}
 	return rating.Card{
+		RewardType:        t.RewardType,
+		Reward:            field(rating.FieldReward, t.Reward),
 		Context:           field(rating.FieldContext, t.Context),
 		Need:              field(rating.FieldNeed, t.Need),
 		Users:             field(rating.FieldUsers, t.Users),
@@ -103,6 +107,7 @@ func (t Task) Card() rating.Card {
 
 func (t Task) fieldTexts() map[string]string {
 	return map[string]string{
+		rating.FieldReward:            t.Reward,
 		rating.FieldContext:           t.Context,
 		rating.FieldNeed:              t.Need,
 		rating.FieldUsers:             t.Users,
@@ -116,7 +121,7 @@ func (t Task) fieldTexts() map[string]string {
 }
 
 // confirmableTexts returns the stored value of every confirmable field the
-// task holds. Reward is absent until the task stores a reward.
+// task holds.
 func (t Task) confirmableTexts() map[string]string {
 	texts := t.fieldTexts()
 	texts[FieldTitle] = t.Title
@@ -126,11 +131,14 @@ func (t Task) confirmableTexts() map[string]string {
 
 // keepUnchangedConfirmations returns the requested confirmations whose field
 // value equals the stored one. A changed field must be confirmed again by a
-// later save.
+// later save. Changing the reward type also clears the reward confirmation.
 func keepUnchangedConfirmations(t, stored Task) []string {
 	next, prev := t.confirmableTexts(), stored.confirmableTexts()
 	confirmed := make([]string, 0, len(t.Confirmed))
 	for _, f := range t.Confirmed {
+		if f == rating.FieldReward && t.RewardType != stored.RewardType {
+			continue
+		}
 		if next[f] == prev[f] {
 			confirmed = append(confirmed, f)
 		}
@@ -167,6 +175,12 @@ func validateTask(t *Task) error {
 	}
 	if !ValidCategory(t.Category) {
 		return &ValidationError{Field: "category", Message: "неизвестная категория «" + t.Category + "»"}
+	}
+	if !rating.ValidRewardType(t.RewardType) {
+		return &ValidationError{Field: "reward_type", Message: "неизвестный тип вознаграждения «" + t.RewardType + "»"}
+	}
+	if len([]rune(t.Reward)) > 300 {
+		return &ValidationError{Field: "reward", Message: "описание вознаграждения не должно превышать 300 символов"}
 	}
 	seen := make(map[string]bool, len(t.Confirmed))
 	confirmed := make([]string, 0, len(t.Confirmed))
@@ -227,11 +241,11 @@ func (s *Store) CreateTask(ctx context.Context, t *Task) error {
 	res, err := s.DB.ExecContext(ctx, `INSERT INTO tasks (
 		company, title, industry, category, draft_text, qa,
 		context, need, users, data, constraints, expected_result, success_criteria,
-		contact, interaction_format, confirmed, status, score, created_at
-	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		contact, interaction_format, reward_type, reward, confirmed, status, score, created_at
+	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		t.Company, t.Title, t.Industry, t.Category, t.DraftText, qa,
 		t.Context, t.Need, t.Users, t.Data, t.Constraints, t.ExpectedResult, t.SuccessCriteria,
-		t.Contact, t.InteractionFormat, confirmed, t.Status, t.Score, formatTime(t.CreatedAt))
+		t.Contact, t.InteractionFormat, t.RewardType, t.Reward, confirmed, t.Status, t.Score, formatTime(t.CreatedAt))
 	if err != nil {
 		return fmt.Errorf("создать задачу: %w", err)
 	}
@@ -288,12 +302,12 @@ func (s *Store) UpdateTask(ctx context.Context, t *Task) error {
 	_, err = tx.ExecContext(ctx, `UPDATE tasks SET
 		company = ?, title = ?, industry = ?, category = ?, qa = ?,
 		context = ?, need = ?, users = ?, data = ?, constraints = ?, expected_result = ?,
-		success_criteria = ?, contact = ?, interaction_format = ?, confirmed = ?, score = ?,
+		success_criteria = ?, contact = ?, interaction_format = ?, reward_type = ?, reward = ?, confirmed = ?, score = ?,
 		status = ?, published_at = ?
 		WHERE id = ?`,
 		t.Company, t.Title, t.Industry, t.Category, qa,
 		t.Context, t.Need, t.Users, t.Data, t.Constraints, t.ExpectedResult,
-		t.SuccessCriteria, t.Contact, t.InteractionFormat, confirmed, t.Score,
+		t.SuccessCriteria, t.Contact, t.InteractionFormat, t.RewardType, t.Reward, confirmed, t.Score,
 		t.Status, publishedAt, t.ID)
 	if err != nil {
 		return fmt.Errorf("обновить задачу %d: %w", t.ID, err)
@@ -314,7 +328,7 @@ func scanTask(row rowScanner) (Task, error) {
 	var publishedAt sql.NullString
 	err := row.Scan(&t.ID, &t.Company, &t.Title, &t.Industry, &t.Category, &t.DraftText, &qa,
 		&t.Context, &t.Need, &t.Users, &t.Data, &t.Constraints, &t.ExpectedResult, &t.SuccessCriteria,
-		&t.Contact, &t.InteractionFormat, &confirmed, &t.Status, &t.Score, &createdAt, &publishedAt)
+		&t.Contact, &t.InteractionFormat, &t.RewardType, &t.Reward, &confirmed, &t.Status, &t.Score, &createdAt, &publishedAt)
 	if err != nil {
 		return Task{}, err
 	}
