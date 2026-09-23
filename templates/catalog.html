@@ -4,7 +4,7 @@
   {{range .Cards}}
   <article class="card level-{{.Level}}">
     <div class="card-head">
-      <h2>{{.Title}}</h2>
+      <h2><a href="/static/task-builder/task.html?id={{.ID}}">{{.Title}}</a></h2>
       <span class="score">{{.Score}} / 100</span>
     </div>
     {{if .Meta}}<p class="meta">{{.Meta}}</p>{{end}}
