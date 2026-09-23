@@ -29,14 +29,14 @@
     if (session.role) {
       const leave = node('button', 'Сменить роль', 'secondary switch-role'); leave.type = 'button';
       leave.addEventListener('click', async () => {
-        if (!confirm('Сменить роль? Задачи, команды и отклики сохранятся; в этом браузере нужно будет снова выбрать роль.')) return;
+        if (!await TaskLab.confirm('Задачи, команды и отклики сохранятся; в этом браузере нужно будет снова выбрать роль.', { title: 'Сменить роль?', ok: 'Сменить роль' })) return;
         leave.disabled = true;
         try {
           const response = await fetch('/api/session', { method: 'DELETE', credentials: 'same-origin' });
           if (!response.ok) throw new Error('Не удалось сменить роль. Попробуйте ещё раз.');
           try { sessionStorage.clear(); } catch { /* Role selection works without browser storage. */ }
           location.href = '/static/task-builder/login.html';
-        } catch (error) { leave.disabled = false; alert(error.message); }
+        } catch (error) { leave.disabled = false; await TaskLab.confirm(error.message, { title: 'Не удалось сменить роль', ok: 'Понятно', cancel: 'Закрыть' }); }
       });
       badge.after(leave);
     }

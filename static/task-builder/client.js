@@ -17,6 +17,32 @@ window.TaskLab = {
       throw error;
     } finally { clearTimeout(timeout); }
   },
+  // Styled replacement for window.confirm: resolves true only on the confirm button.
+  confirm(message, { ok = 'Подтвердить', cancel = 'Отмена', title = 'Подтвердите действие' } = {}) {
+    return new Promise(resolve => {
+      const { node } = TaskLab;
+      const dialog = node('dialog', undefined, 'modal confirm-dialog');
+      const heading = node('h2', title); heading.id = 'confirm-title';
+      dialog.setAttribute('aria-labelledby', heading.id);
+      const actions = node('div', undefined, 'buttons');
+      const no = node('button', cancel, 'secondary'); no.type = 'button';
+      const yes = node('button', ok, 'primary'); yes.type = 'button';
+      actions.append(no, yes); dialog.append(heading, node('p', message), actions);
+      let settled = false;
+      const finish = value => {
+        if (settled) return;
+        settled = true;
+        if (dialog.open) dialog.close();
+        dialog.remove(); resolve(value);
+      };
+      no.addEventListener('click', () => finish(false));
+      yes.addEventListener('click', () => finish(true));
+      dialog.addEventListener('click', event => { if (event.target === dialog) finish(false); });
+      dialog.addEventListener('cancel', event => { event.preventDefault(); finish(false); });
+      dialog.addEventListener('close', () => finish(false));
+      document.body.append(dialog); dialog.showModal(); yes.focus();
+    });
+  },
   node(tag, text, className) {
     const node = document.createElement(tag);
     if (text !== undefined) node.textContent = text;

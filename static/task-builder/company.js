@@ -10,7 +10,7 @@
  form.addEventListener('submit',async event=>{
   event.preventDefault();const button=form.querySelector('button');if(button.disabled)return;
   const company=form.elements.company.value.trim();if(!company){error.textContent='Укажите название компании.';return;}
-  if(!confirm(`Закрепить компанию «${company}» за вашей сессией? Сменить компанию после этого нельзя.`))return;
+  if(!await TaskLab.confirm(`Закрепить компанию «${company}» за вашей сессией? Сменить компанию можно только через «Сменить роль».`,{title:'Выбор компании',ok:'Закрепить'}))return;
   button.disabled=true;error.textContent='';
   try { await request('/api/session/company',{method:'POST',body:JSON.stringify({company})});location.href='business.html'; }
   catch(e){error.textContent=e.message;button.disabled=false;}

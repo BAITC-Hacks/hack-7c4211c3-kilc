@@ -94,8 +94,8 @@ function renderProposals(proposals) {
       const actions = node('div', undefined, 'buttons');
       for (const [status, label] of [['accepted', 'Выбрать команду'], ['rejected', 'Отклонить']]) {
         const button = node('button', label, status === 'accepted' ? 'primary' : 'secondary'); button.type = 'button'; button.disabled = busy;
-        button.addEventListener('click', () => {
-          if (busy || !window.confirm(status === 'accepted' ? `Выбрать команду «${name}» для этой задачи?` : `Отклонить предложение команды «${name}»?`)) return;
+        button.addEventListener('click', async () => {
+          if (busy || !await TaskLab.confirm(status === 'accepted' ? `Выбрать команду «${name}» для этой задачи?` : `Отклонить предложение команды «${name}»?`, { title: status === 'accepted' ? 'Выбор команды' : 'Отклонение предложения', ok: label })) return;
           changeProposal(proposal.id, 'decision', { status });
         }); actions.append(button);
       }
@@ -111,10 +111,10 @@ function renderProposals(proposals) {
         field.append(label, input);
         const button = node('button', 'Подтвердить этап', 'primary'); button.type = 'submit'; button.disabled = busy;
         const actions = node('div', undefined, 'buttons'); actions.append(button); form.append(field, actions);
-        form.addEventListener('submit', event => {
+        form.addEventListener('submit', async event => {
           event.preventDefault(); if (busy || !form.reportValidity()) return;
           const points = Number(input.value);
-          if (!window.confirm(`Подтвердить этап команды «${name}» и начислить ${points} баллов?`)) return;
+          if (!await TaskLab.confirm(`Подтвердить этап команды «${name}» и начислить ${points} баллов?`, { title: 'Подтверждение этапа', ok: 'Подтвердить этап' })) return;
           changeProposal(proposal.id, 'stage', { points });
         }); card.append(form);
       }

@@ -31,7 +31,7 @@ async function initTeams() {
 
   async function selectTeam(team) {
     if (busy || selected) return;
-    if (!window.confirm(`Вступить в команду «${team.name}»? После подтверждения смена команды недоступна.`)) return;
+    if (!await TaskLab.confirm(`Вступить в команду «${team.name}»? Сменить команду можно только через «Сменить роль».`, { title: 'Выбор команды', ok: 'Вступить' })) return;
     busy = true; render();
     try {
       TaskLab.session = await request('/api/session/team', { method:'POST', body:JSON.stringify({team_id:team.id}) });

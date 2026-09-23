@@ -209,9 +209,9 @@ async function save(publish) {
 form.addEventListener('submit', event => { event.preventDefault(); save(false); });
 $('#publish').addEventListener('click', () => save(true));
 $('#reset').textContent = 'Новая задача';
-$('#reset').addEventListener('click', () => {
-  if (!confirm('Начать новую задачу? Несохранённые изменения будут потеряны. Записи в базе останутся.')) return;
-  form.reset(); form.elements.company.value = TaskLab.session.company; taskId = null; qa = []; questionsDraft = ''; confirmed.clear(); currentTask = null; savedStatus = '';
+$('#reset').addEventListener('click', async () => {
+  if (!await TaskLab.confirm('Несохранённые изменения будут потеряны. Записи в базе останутся.', { title: 'Начать новую задачу?', ok: 'Начать заново' })) return;
+  HTMLFormElement.prototype.reset.call(form); form.elements.company.value = TaskLab.session.company; taskId = null; qa = []; questionsDraft = ''; confirmed.clear(); currentTask = null; savedStatus = '';
   renderQuestions(); $('#ai-status').textContent = '';
   history.replaceState(null, '', location.pathname); form.elements.draft_text.readOnly = false;
   $('#preview').hidden = true; saveLocalDraft(); updateChecks(); invalidateRating();
@@ -243,7 +243,7 @@ $('#ai-questions').addEventListener('click', async () => {
   if (busy) return;
   const draft = form.elements.draft_text.value;
   if (!draft.trim()) { $('#ai-status').textContent = 'Сначала введите исходное описание задачи.'; form.elements.draft_text.focus(); return; }
-  if (qa.some(item => item.answer?.trim()) && !confirm('Получить новые вопросы? Текущие ответы будут заменены.')) return;
+  if (qa.some(item => item.answer?.trim()) && !await TaskLab.confirm('Текущие ответы будут заменены.', { title: 'Получить новые вопросы?', ok: 'Получить вопросы' })) return;
   lock(true); $('#ai-status').textContent = 'Готовим уточняющие вопросы…';
   try {
     const result = await request('/api/ai/questions', { method: 'POST', body: JSON.stringify({ draft_text: draft }) });
@@ -257,7 +257,7 @@ $('#ai-generate').addEventListener('click', async () => {
   if (busy) return;
   const draft = form.elements.draft_text.value;
   if (draft !== questionsDraft || qa.length < 3) { $('#ai-status').textContent = 'Получите уточняющие вопросы для текущего описания.'; return; }
-  if (generatedFields.some(key => values()[key]) && !confirm('Заменить название, категорию и поля описания предложенной карточкой? Их подтверждения будут сняты.')) return;
+  if (generatedFields.some(key => values()[key]) && !await TaskLab.confirm('Название, категория и поля описания будут заменены предложенной карточкой, их подтверждения будут сняты.', { title: 'Заменить поля карточки?', ok: 'Заменить' })) return;
   lock(true); $('#ai-status').textContent = 'Формируем карточку по вашему описанию и ответам…';
   try {
     const result = await request('/api/ai/card', { method: 'POST', body: JSON.stringify({ draft_text: draft, qa }) });

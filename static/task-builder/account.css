@@ -68,3 +68,4 @@ button:not(:disabled):active,.nav a:active { transform:scale(.98); }
 
 .company-setup{max-width:650px}.company-label{flex:1;overflow-wrap:anywhere}.session-badge{max-width:280px;overflow-wrap:anywhere}.team-card .tags{margin-top:8px}
 .switch-role{margin-left:8px;padding:8px 14px;font-size:12px}
+.confirm-dialog p{font-size:14px;line-height:1.6;color:var(--muted);margin:10px 0 22px;overflow-wrap:anywhere}.confirm-dialog h2{margin:0}
