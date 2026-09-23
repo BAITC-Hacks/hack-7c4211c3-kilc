@@ -1,17 +1,22 @@
 package main
 
 import (
-	_ "embed"
+	"embed"
 	"encoding/json"
+	"io/fs"
 	"log"
 	"net/http"
 	"os"
 
+	"github.com/BAITC-Hacks/hack-7c4211c3-kilc/api"
 	"github.com/BAITC-Hacks/hack-7c4211c3-kilc/store"
 )
 
 //go:embed schema.sql
 var schema string
+
+//go:embed static/task-builder/*
+var frontend embed.FS
 
 func main() {
 	port := envOr("PORT", "8080")
@@ -24,6 +29,15 @@ func main() {
 	defer st.Close()
 
 	mux := http.NewServeMux()
+	api.RegisterFrontend(mux, st)
+	assets, err := fs.Sub(frontend, "static/task-builder")
+	if err != nil {
+		log.Fatalf("интерфейс: %v", err)
+	}
+	mux.Handle("GET /static/task-builder/", http.StripPrefix("/static/task-builder/", http.FileServer(http.FS(assets))))
+	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/static/task-builder/login.html", http.StatusSeeOther)
+	})
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
 		if err := st.Ping(r.Context()); err != nil {
 			log.Printf("health: %v", err)

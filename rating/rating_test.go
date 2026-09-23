@@ -181,7 +181,10 @@ func TestScoreFieldQualityHints(t *testing.T) {
 }
 
 func TestScoreHintGainOrder(t *testing.T) {
-	result := Score(Card{Data: Field{}, Users: Field{}})
+	card := fullCard(true)
+	card.Data = Field{}
+	card.Users = Field{}
+	result := Score(card)
 	if len(result.Hints) < 2 {
 		t.Fatalf("got %d hints, want at least 2", len(result.Hints))
 	}

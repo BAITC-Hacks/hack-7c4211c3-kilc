@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Конструктор бизнес-задачи</title>
   <link rel="stylesheet" href="styles.css">
-  <script src="app.js" defer></script>
+  <script src="client.js" defer></script><script src="app.js" defer></script>
 </head>
 <body>
-  <header class="topbar"><a class="brand" href="./index.html">◈ TaskLab</a><span>Бизнес → студенческие команды</span></header>
+  <header class="topbar"><a class="brand" href="./index.html">◈ TaskLab</a><nav aria-label="Навигация"><a href="teams.html" style="color:#23634b;margin-right:18px">Команды</a><a href="login.html" style="color:#23634b">Войти</a></nav></header>
   <main>
     <div class="intro"><span class="eyebrow">НОВАЯ ЗАДАЧА</span><h1>Превратите идею<br>в понятную задачу</h1><p>Ответьте на вопросы, чтобы команда поняла вашу проблему и могла предложить решение.</p></div>
     <div class="layout">
@@ -16,11 +16,11 @@
         <section class="section"><div class="section-heading"><span class="number">01</span><div><h2>О задаче</h2><p>Начнём с того, что нужно изменить.</p></div></div><div id="basics-fields"></div></section>
         <section class="section"><div class="section-heading"><span class="number">02</span><div><h2>Результат и ресурсы</h2><p>Помогите команде оценить объём работы.</p></div></div><div id="details-fields"></div></section>
         <section class="section"><div class="section-heading"><span class="number">03</span><div><h2>Взаимодействие</h2><p>Расскажите, как связаться с вами.</p></div></div><div id="contact-fields"></div></section>
-        <section class="section actions"><label class="confirmation"><input id="confirmed" type="checkbox" required><span>Я проверил сведения и подтверждаю их достоверность.</span></label><p class="hint">Обязательно только название. Недостающие сведения снизят рейтинг, но не помешают создать карточку.</p><div class="buttons"><button type="submit" class="primary">Сформировать карточку <span aria-hidden="true">↗</span></button><button type="button" id="reset" class="secondary">Очистить</button></div><p id="save-status" class="hint" role="status"></p></section>
+        <section class="section actions"><label class="confirmation"><input id="confirmed" type="checkbox"><span>Подтвердить все заполненные поля. Изменение ответа снимает подтверждение только с этого поля.</span></label><p class="hint">Для сохранения нужен исходный черновик. Для публикации — название и подтверждение заполненных полей. Низкий рейтинг не запрещает публикацию.</p><div class="buttons"><button type="submit" class="primary">Сохранить задачу <span aria-hidden="true">↗</span></button><button type="button" id="publish" class="primary">Опубликовать</button><button type="button" id="reset" class="secondary">Очистить</button></div><p id="save-status" class="hint" role="status"></p></section>
       </form>
-      <aside><section class="score-card"><span class="eyebrow">ГОТОВНОСТЬ ЗАДАЧИ</span><div class="score"><strong id="score">0</strong><span>/ 100</span></div><progress id="progress" max="100" value="0" aria-label="Полнота задачи"></progress><div class="score-meta"><span id="level" class="badge">Черновик</span><span id="score-state">Предварительная оценка</span></div><p class="hint">Баллы становятся подтверждёнными после вашей проверки. Рейтинг отражает полноту сведений, а не качество решения.</p><div id="breakdown"></div><div class="next"><h3>Что добавить дальше</h3><p id="next-tip"></p></div></section><p class="privacy">Черновик сохраняется только в этом браузере. При заполнении не указывайте секретные данные.</p></aside>
+      <aside><section class="score-card"><span class="eyebrow">ГОТОВНОСТЬ ЗАДАЧИ</span><div class="score"><strong id="score">0</strong><span>/ 100</span></div><progress id="progress" max="100" value="0" aria-label="Полнота задачи"></progress><div class="score-meta"><span id="level" class="badge">Черновик</span><span id="score-state">Оценка сервера</span></div><p class="hint">Баллы становятся подтверждёнными после вашей проверки. Рейтинг отражает полноту сведений, а не качество решения.</p><div id="breakdown"></div><div class="next"><h3>Что добавить дальше</h3><p id="next-tip"></p></div></section><p class="privacy">Несохранённый черновик имеет локальную копию. Кнопки сохранения и публикации записывают задачу в базу сервера.</p></aside>
     </div>
-    <section id="preview" class="section preview" hidden aria-labelledby="preview-heading"><span class="eyebrow">ПРЕДПРОСМОТР</span><h2 id="preview-heading" tabindex="-1">Карточка задачи</h2><p class="hint">Карточка сформирована локально. Для публикации подключите каталог или сервер.</p><div id="preview-content"></div><button type="button" id="download" class="primary">Скачать карточку JSON</button></section>
+    <section id="preview" class="section preview" hidden aria-labelledby="preview-heading"><span class="eyebrow">ПРЕДПРОСМОТР</span><h2 id="preview-heading" tabindex="-1">Карточка задачи</h2><p class="hint">Карточка сохранена в базе данных сервера.</p><div id="preview-content"></div><button type="button" id="download" class="primary">Скачать карточку JSON</button></section>
   </main>
 </body>
 </html>
