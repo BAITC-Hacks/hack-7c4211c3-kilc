@@ -2,6 +2,7 @@ package api
 
 import (
 	"bytes"
+	"errors"
 	"html/template"
 	"log"
 	"net/http"
@@ -27,23 +28,56 @@ type catalogCard struct {
 	Level      string
 	LevelLabel string
 	Need       string
+	Category   string
 }
 
 type catalogPage struct {
-	Cards []catalogCard
+	Cards      []catalogCard
+	Categories []store.Category
+	Industries []string
+	Levels     []rating.Level
+	Category   string
+	Industry   string
+	Level      string
+	Count      int
+	Error      string
 }
 
 // Catalog renders every published task, highest rating first. Low-rated
 // cards are shown like any other; only their styling differs.
 func Catalog(st *store.Store, tpl *template.Template) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		tasks, err := st.ListCatalog(r.Context(), store.CatalogFilter{})
+		filter := store.CatalogFilter{Category: r.URL.Query().Get("category"), Industry: r.URL.Query().Get("industry"), Level: r.URL.Query().Get("level")}
+		tasks, err := st.ListCatalog(r.Context(), filter)
+		status := http.StatusOK
+		filterError := ""
+		if err != nil {
+			var validationErr *store.ValidationError
+			if !errors.As(err, &validationErr) {
+				log.Printf("каталог: %v", err)
+				http.Error(w, "Не удалось загрузить каталог: "+err.Error(), http.StatusInternalServerError)
+				return
+			}
+			status = http.StatusBadRequest
+			filterError = validationErr.Message
+			filter = store.CatalogFilter{}
+			tasks, err = st.ListCatalog(r.Context(), filter)
+			if err != nil {
+				log.Printf("каталог: %v", err)
+				http.Error(w, "Не удалось загрузить каталог: "+err.Error(), http.StatusInternalServerError)
+				return
+			}
+		}
+		industries, err := st.ListIndustries(r.Context())
 		if err != nil {
 			log.Printf("каталог: %v", err)
 			http.Error(w, "Не удалось загрузить каталог: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
-		page := catalogPage{Cards: make([]catalogCard, 0, len(tasks))}
+		page := catalogPage{Cards: make([]catalogCard, 0, len(tasks)), Categories: store.Categories, Industries: industries, Levels: rating.Levels(), Category: filter.Category, Industry: filter.Industry, Level: filter.Level, Count: len(tasks)}
+		if status == http.StatusBadRequest {
+			page.Error = "Неизвестный фильтр: " + filterError
+		}
 		for _, t := range tasks {
 			level := rating.LevelFor(t.Score)
 			page.Cards = append(page.Cards, catalogCard{
@@ -53,6 +87,7 @@ func Catalog(st *store.Store, tpl *template.Template) http.HandlerFunc {
 				Level:      level,
 				LevelLabel: levelLabels[level],
 				Need:       excerpt(t.Need, needExcerptRunes),
+				Category:   store.CategoryLabel(t.Category),
 			})
 		}
 		var buf bytes.Buffer
@@ -62,6 +97,7 @@ func Catalog(st *store.Store, tpl *template.Template) http.HandlerFunc {
 			return
 		}
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.WriteHeader(status)
 		if _, err := buf.WriteTo(w); err != nil {
 			log.Printf("каталог: ответ: %v", err)
 		}
