@@ -1,6 +1,6 @@
 'use strict';
 
-// Поля можно переиспользовать при подключении API или AI-помощника.
+// Поля карточки и ограничения формы.
 const fields = [
   { id: 'draft_text', group: 'basics', label: 'Опишите исходную задачу', placeholder: 'Расскажите о своей потребности своими словами…', hint: 'После первого сохранения исходное описание сохраняется без изменений.', max: 4000, required: true },
   { id: 'company', group: 'basics', label: 'Компания', placeholder: 'Название компании', hint: 'Кто предлагает задачу?', type: 'text', max: 250 },
@@ -22,11 +22,13 @@ const { request, node } = window.TaskLab;
 const form = document.querySelector('#task-form');
 const $ = selector => document.querySelector(selector);
 const ratingFields = ['context', 'need', 'users', 'data', 'constraints', 'expected_result', 'success_criteria', 'contact', 'interaction_format'];
-const confirmableFields = [...ratingFields, 'reward'];
+const generatedFields = ['title', 'category', ...ratingFields];
+const confirmableFields = [...generatedFields, 'reward'];
 const confirmed = new Set();
 const DRAFT_KEY = 'tasklab-server-draft-v1';
 let taskId = null;
 let qa = [];
+let questionsDraft = '';
 let currentTask = null;
 let revision = 0;
 let timer;
@@ -43,7 +45,7 @@ for (const field of fields) {
   input.setAttribute('aria-describedby', `${field.id}-hint`);
   const hint = node('p', field.hint, 'hint'); hint.id = `${field.id}-hint`;
   wrapper.append(label, input, hint);
-  if (ratingFields.includes(field.id)) {
+  if (generatedFields.includes(field.id)) {
     const checkLabel = node('label', undefined, 'confirmation');
     checkLabel.style.marginTop = '10px';
     const check = node('input'); check.type = 'checkbox'; check.dataset.confirm = field.id;
@@ -113,12 +115,22 @@ async function refreshRating() {
 }
 function saveLocalDraft() {
   if (taskId) return;
-  try { localStorage.setItem(DRAFT_KEY, JSON.stringify(values())); setStatus('Локальная копия сохранена. Для записи в базу нажмите «Сохранить задачу».'); }
+  try { localStorage.setItem(DRAFT_KEY, JSON.stringify({ ...values(), qa, questionsDraft })); setStatus('Локальная копия сохранена. Для записи в базу нажмите «Сохранить задачу».'); }
   catch { setStatus('Локальная копия не сохранена. Можно сохранить задачу непосредственно на сервере.'); }
 }
 form.addEventListener('input', event => {
   if (busy) return;
   const target = event.target;
+  if (target.dataset.answer !== undefined) {
+    qa[Number(target.dataset.answer)].answer = target.value;
+    saveLocalDraft();
+    if (taskId) setStatus('Есть несохранённые ответы на вопросы.');
+    return;
+  }
+  if (target.name === 'draft_text') {
+    qa = []; questionsDraft = ''; renderQuestions();
+    $('#ai-status').textContent = 'Описание изменено. Получите вопросы для нового описания.';
+  }
   if (target.dataset.confirm) {
     if (target.checked && values()[target.dataset.confirm]) confirmed.add(target.dataset.confirm);
     else confirmed.delete(target.dataset.confirm);
@@ -155,6 +167,8 @@ async function save(publish) {
   try {
     let task = await request(taskId ? `/api/tasks/${taskId}` : '/api/tasks', { method: taskId ? 'PUT' : 'POST', body: JSON.stringify(body) });
     taskId = task.id;
+    confirmed.clear();
+    for (const key of task.confirmed) confirmed.add(key);
     history.replaceState(null, '', `?id=${taskId}`);
     let localWarning = '';
     try { localStorage.removeItem(DRAFT_KEY); } catch { localWarning = ' Локальную копию удалить не удалось.'; }
@@ -176,7 +190,8 @@ $('#publish').addEventListener('click', () => save(true));
 $('#reset').textContent = 'Новая задача';
 $('#reset').addEventListener('click', () => {
   if (!confirm('Начать новую задачу? Несохранённые изменения будут потеряны. Записи в базе останутся.')) return;
-  form.reset(); taskId = null; qa = []; confirmed.clear(); currentTask = null;
+  form.reset(); taskId = null; qa = []; questionsDraft = ''; confirmed.clear(); currentTask = null;
+  renderQuestions(); $('#ai-status').textContent = '';
   history.replaceState(null, '', location.pathname); form.elements.draft_text.readOnly = false;
   $('#preview').hidden = true; saveLocalDraft(); updateChecks(); invalidateRating();
 });
@@ -185,6 +200,56 @@ $('#download').addEventListener('click', () => {
   const url = URL.createObjectURL(new Blob([JSON.stringify(currentTask, null, 2)], { type: 'application/json' }));
   const link = node('a'); link.href = url; link.download = `task-${currentTask.id}.json`; link.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+});
+
+function renderQuestions() {
+  const container = $('#ai-answers'); container.replaceChildren();
+  qa.forEach((item, index) => {
+    const wrapper = node('div', undefined, 'field');
+    const label = node('label', item.question); label.htmlFor = `ai-answer-${index}`;
+    const answer = node('textarea'); answer.id = label.htmlFor;
+    answer.dataset.answer = index; answer.maxLength = 2000; answer.value = item.answer || '';
+    wrapper.append(label, answer); container.append(wrapper);
+  });
+  $('#ai-generate').hidden = qa.length < 3;
+}
+function sourceMessage(source) {
+  return source === 'stub'
+    ? 'Использована заглушка без модели: она переносит только ваши сведения.'
+    : 'Использована AI-модель. Проверьте точность предложенных сведений.';
+}
+$('#ai-questions').addEventListener('click', async () => {
+  if (busy) return;
+  const draft = form.elements.draft_text.value;
+  if (!draft.trim()) { $('#ai-status').textContent = 'Сначала введите исходное описание задачи.'; form.elements.draft_text.focus(); return; }
+  if (qa.some(item => item.answer?.trim()) && !confirm('Получить новые вопросы? Текущие ответы будут заменены.')) return;
+  lock(true); $('#ai-status').textContent = 'Готовим уточняющие вопросы…';
+  try {
+    const result = await request('/api/ai/questions', { method: 'POST', body: JSON.stringify({ draft_text: draft }) });
+    qa = result.questions.map(item => ({ ...item, answer: '' }));
+    questionsDraft = draft; renderQuestions(); saveLocalDraft();
+    $('#ai-status').textContent = `${sourceMessage(result.source)} Ответьте на вопросы и нажмите «Сформировать карточку».`;
+  } catch (error) { $('#ai-status').textContent = error.message; }
+  finally { lock(false); updateChecks(); }
+});
+$('#ai-generate').addEventListener('click', async () => {
+  if (busy) return;
+  const draft = form.elements.draft_text.value;
+  if (draft !== questionsDraft || qa.length < 3) { $('#ai-status').textContent = 'Получите уточняющие вопросы для текущего описания.'; return; }
+  if (generatedFields.some(key => values()[key]) && !confirm('Заменить название, категорию и поля описания предложенной карточкой? Их подтверждения будут сняты.')) return;
+  lock(true); $('#ai-status').textContent = 'Формируем карточку по вашему описанию и ответам…';
+  try {
+    const result = await request('/api/ai/card', { method: 'POST', body: JSON.stringify({ draft_text: draft, qa }) });
+    for (const key of generatedFields) {
+      form.elements[key].value = result.card[key] || '';
+      confirmed.delete(key);
+    }
+    currentTask = null; $('#preview').hidden = true;
+    saveLocalDraft(); invalidateRating();
+    setStatus('Карточка сформирована в форме. Проверьте и подтвердите заполненные поля, затем сохраните задачу.');
+    $('#ai-status').textContent = `${sourceMessage(result.source)} Карточка ещё не сохранена и не опубликована.`;
+  } catch (error) { $('#ai-status').textContent = error.message; }
+  finally { lock(false); updateChecks(); }
 });
 async function init() {
   lock(true);
@@ -199,7 +264,7 @@ async function init() {
     if (requestedID) {
       if (!/^[1-9]\d*$/.test(requestedID)) throw new Error('Некорректный ID задачи в адресе.');
       const task = await request(`/api/tasks/${requestedID}`);
-      taskId = task.id; qa = task.qa || [];
+      taskId = task.id; qa = task.qa || []; questionsDraft = task.draft_text;
       for (const field of fields) form.elements[field.id].value = task[field.id] || '';
       form.elements.reward.value = task.reward || '';
       form.elements.reward_type.value = task.reward_type || '';
@@ -214,9 +279,12 @@ async function init() {
         }
         if (draft && typeof draft.reward === 'string') form.elements.reward.value = draft.reward.slice(0, 300);
         if (draft && typeof draft.reward_type === 'string') form.elements.reward_type.value = draft.reward_type;
+        if (draft && draft.questionsDraft === form.elements.draft_text.value && Array.isArray(draft.qa) && draft.qa.length <= 5 && draft.qa.every(item => item && ratingFields.includes(item.field) && typeof item.question === 'string' && typeof item.answer === 'string')) {
+          qa = draft.qa; questionsDraft = draft.questionsDraft;
+        }
       } catch { setStatus('Не удалось восстановить локальный черновик. Заполните поля заново.'); }
     }
-    lock(false); updateChecks(); await refreshRating();
+    renderQuestions(); lock(false); updateChecks(); await refreshRating();
   } catch (error) {
     setStatus(`${error.message} После исправления обновите страницу.`);
     $('#score').textContent = '—'; $('#level').textContent = 'Нет соединения';

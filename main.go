@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/BAITC-Hacks/hack-7c4211c3-kilc/ai"
 	"github.com/BAITC-Hacks/hack-7c4211c3-kilc/api"
 	"github.com/BAITC-Hacks/hack-7c4211c3-kilc/store"
 )
@@ -53,6 +54,7 @@ func main() {
 	}
 
 	mux := http.NewServeMux()
+	api.RegisterAI(mux, ai.New())
 	api.RegisterFrontend(mux, st)
 	api.RegisterRewardTypes(mux)
 	api.RegisterProposals(mux, st)
