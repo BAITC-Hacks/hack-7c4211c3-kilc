@@ -5,11 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Каталог задач — TaskLab</title>
   <link rel="stylesheet" href="/static/style.css">
-  <script src="/static/nav.js" defer></script>
-  <script src="/static/task-builder/client.js" defer></script>
-</head>
+  <script src="/static/task-builder/client.js" defer></script><script src="/static/nav.js" defer></script><script src="/static/chat.js" defer></script>
+<link rel="stylesheet" href="/static/chat.css"></head>
 <body>
-  <header class="topbar"><a class="brand" href="/">◈ TaskLab</a><nav class="nav" aria-label="Основная навигация"><a href="/">Каталог</a><a href="/static/task-builder/index.html">Новая задача</a><a href="/static/task-builder/teams.html">Команды</a><a href="/static/task-builder/business.html">Кабинет бизнеса</a><a href="/static/task-builder/login.html" data-role-link>Роль: не выбрана</a></nav></header>
+  <header class="topbar"><a class="brand" href="/">◈ TaskLab</a><nav class="nav" aria-label="Основная навигация"><span class="hint">Загрузка…</span></nav><span id="session-badge" class="session-badge"></span></header>
   <main>
     <div class="intro"><span class="eyebrow">ПРАКТИКА С БИЗНЕСОМ</span><h1>Задачи для вашей команды</h1><p>Найдите задачу по интересам и предложите своё решение. На любую опубликованную задачу можно откликнуться независимо от рейтинга.</p></div>
     {{block "content" .}}{{end}}

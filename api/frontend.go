@@ -70,12 +70,14 @@ type taskBody struct {
 	Contact           string     `json:"contact"`
 	InteractionFormat string     `json:"interaction_format"`
 	Confirmed         []string   `json:"confirmed"`
+	Reward            string     `json:"reward"`
+	RewardType        string     `json:"reward_type"`
 }
 
 func (b taskBody) task() store.Task {
 	return store.Task{Company: b.Company, Title: b.Title, Industry: b.Industry, Category: b.Category, DraftText: b.DraftText, QA: b.QA,
 		Context: b.Context, Need: b.Need, Users: b.Users, Data: b.Data, Constraints: b.Constraints, ExpectedResult: b.ExpectedResult,
-		SuccessCriteria: b.SuccessCriteria, Contact: b.Contact, InteractionFormat: b.InteractionFormat, Confirmed: b.Confirmed}
+		SuccessCriteria: b.SuccessCriteria, Contact: b.Contact, InteractionFormat: b.InteractionFormat, Confirmed: b.Confirmed, Reward: b.Reward, RewardType: b.RewardType}
 }
 
 type taskView struct {
@@ -86,7 +88,7 @@ type taskView struct {
 }
 
 func viewTask(t store.Task) taskView {
-	return taskView{t.ID, taskBody{t.Company, t.Title, t.Industry, t.Category, t.DraftText, t.QA, t.Context, t.Need, t.Users, t.Data, t.Constraints, t.ExpectedResult, t.SuccessCriteria, t.Contact, t.InteractionFormat, t.Confirmed}, t.Status, rating.Score(t.Card())}
+	return taskView{t.ID, taskBody{t.Company, t.Title, t.Industry, t.Category, t.DraftText, t.QA, t.Context, t.Need, t.Users, t.Data, t.Constraints, t.ExpectedResult, t.SuccessCriteria, t.Contact, t.InteractionFormat, t.Confirmed, t.Reward, t.RewardType}, t.Status, rating.Score(t.Card())}
 }
 
 func decodeFrontend(w http.ResponseWriter, r *http.Request, target any) bool {
@@ -141,6 +143,9 @@ func (h frontendHandler) listTeams(w http.ResponseWriter, r *http.Request) {
 	}
 	result := make([]teamView, 0, len(items))
 	for _, t := range items {
+		if session := requestSession(r); session != nil && session.Role == "student" && session.TeamID != 0 && session.TeamID != t.ID {
+			continue
+		}
 		result = append(result, viewTeam(t))
 	}
 	writeJSON(w, http.StatusOK, result)
@@ -155,6 +160,10 @@ func (h frontendHandler) createTeam(w http.ResponseWriter, r *http.Request) {
 		frontendError(w, err)
 		return
 	}
+	if err := bindSessionTeam(h.st, r, t.ID); err != nil {
+		frontendError(w, err)
+		return
+	}
 	writeJSON(w, http.StatusCreated, viewTeam(t))
 }
 func (h frontendHandler) catalog(w http.ResponseWriter, r *http.Request) {
@@ -166,6 +175,9 @@ func (h frontendHandler) catalog(w http.ResponseWriter, r *http.Request) {
 	}
 	result := make([]taskView, 0, len(items))
 	for _, t := range items {
+		if session := requestSession(r); session != nil && session.Role == "business" && t.Company != session.Company {
+			continue
+		}
 		result = append(result, viewTask(t))
 	}
 	writeJSON(w, http.StatusOK, result)
@@ -174,6 +186,13 @@ func (h frontendHandler) createTask(w http.ResponseWriter, r *http.Request) {
 	var b taskBody
 	if !decodeFrontend(w, r, &b) {
 		return
+	}
+	if session := requestSession(r); session != nil && session.Role == "business" {
+		if b.Company != "" && strings.TrimSpace(b.Company) != session.Company {
+			writeError(w, 403, "Нельзя создать или изменить задачу от другой компании")
+			return
+		}
+		b.Company = session.Company
 	}
 	t := b.task()
 	if err := h.st.CreateTask(r.Context(), &t); err != nil {
@@ -190,6 +209,10 @@ func (h frontendHandler) getTask(w http.ResponseWriter, r *http.Request) {
 	t, err := h.st.GetTask(r.Context(), id)
 	if err != nil {
 		frontendError(w, err)
+		return
+	}
+	if session := requestSession(r); session != nil && session.Role == "student" && t.Status != store.StatusPublished {
+		writeError(w, 404, "Задача не найдена")
 		return
 	}
 	writeJSON(w, http.StatusOK, viewTask(t))
@@ -211,6 +234,13 @@ func (h frontendHandler) updateTask(w http.ResponseWriter, r *http.Request) {
 	if b.DraftText != previous.DraftText {
 		writeError(w, http.StatusBadRequest, "Исходный черновик нельзя изменять после сохранения")
 		return
+	}
+	if session := requestSession(r); session != nil && session.Role == "business" {
+		if b.Company != "" && strings.TrimSpace(b.Company) != session.Company {
+			writeError(w, 403, "Нельзя создать или изменить задачу от другой компании")
+			return
+		}
+		b.Company = session.Company
 	}
 	t := b.task()
 	t.ID = id

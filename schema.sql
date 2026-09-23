@@ -22,6 +22,9 @@ CREATE TABLE IF NOT EXISTS tasks (
         CHECK (status IN ('draft', 'published')),
     score              INTEGER NOT NULL DEFAULT 0,
     created_at         TEXT    NOT NULL DEFAULT '',
+    reward             TEXT NOT NULL DEFAULT '',
+    reward_type        TEXT NOT NULL DEFAULT '',
+    bonus              INTEGER NOT NULL DEFAULT 0,
     published_at       TEXT
 );
 
@@ -49,4 +52,12 @@ CREATE TABLE IF NOT EXISTS proposals (
     stage_confirmed_at TEXT,
     points_awarded     INTEGER NOT NULL DEFAULT 0,
     created_at         TEXT    NOT NULL DEFAULT ''
+);
+
+CREATE TABLE IF NOT EXISTS browser_sessions (
+ token TEXT PRIMARY KEY,
+ company TEXT NOT NULL DEFAULT '',
+ role TEXT NOT NULL CHECK(role IN ('student','business')),
+ team_id INTEGER REFERENCES teams(id),
+ expires_at INTEGER NOT NULL
 );

@@ -12,6 +12,9 @@ import (
 )
 
 type businessTaskJSON struct {
+	Reward     string `json:"reward"`
+	Bonus      int    `json:"bonus"`
+	Position   int    `json:"position"`
 	ID         int64  `json:"id"`
 	Title      string `json:"title"`
 	Company    string `json:"company"`
@@ -87,6 +90,10 @@ func readBusinessProposal(ctx context.Context, st *store.Store, id int64) (store
 
 func RegisterBusiness(mux *http.ServeMux, st *store.Store) {
 	mux.HandleFunc("GET /api/business/companies", func(w http.ResponseWriter, r *http.Request) {
+		if session := requestSession(r); session != nil && session.Company != "" {
+			writeJSON(w, 200, []string{session.Company})
+			return
+		}
 		companies, err := st.ListCompanies(r.Context())
 		if err != nil {
 			businessError(w, err, "")
@@ -95,7 +102,15 @@ func RegisterBusiness(mux *http.ServeMux, st *store.Store) {
 		writeJSON(w, http.StatusOK, companies)
 	})
 	mux.HandleFunc("GET /api/business/tasks", func(w http.ResponseWriter, r *http.Request) {
-		tasks, err := st.ListBusinessTasks(r.Context(), r.URL.Query().Get("company"))
+		company := r.URL.Query().Get("company")
+		if session := requestSession(r); session != nil {
+			company = session.Company
+			if company == "" {
+				writeError(w, 403, "Сначала укажите компанию")
+				return
+			}
+		}
+		tasks, err := st.ListBusinessTasks(r.Context(), company)
 		if err != nil {
 			businessError(w, err, "")
 			return
@@ -103,7 +118,7 @@ func RegisterBusiness(mux *http.ServeMux, st *store.Store) {
 		result := make([]businessTaskJSON, 0, len(tasks))
 		for _, task := range tasks {
 			level := rating.LevelFor(task.Score)
-			result = append(result, businessTaskJSON{ID: task.ID, Title: task.Title, Company: task.Company, Industry: task.Industry,
+			result = append(result, businessTaskJSON{Reward: task.Reward, Bonus: task.Bonus, Position: task.Score + task.Bonus, ID: task.ID, Title: task.Title, Company: task.Company, Industry: task.Industry,
 				Category: task.Category, Status: task.Status, Score: task.Score, Level: level, LevelLabel: rating.LevelLabel(level),
 				Proposals: task.Proposals, Pending: task.Pending, Accepted: task.Accepted, Rejected: task.Rejected})
 		}

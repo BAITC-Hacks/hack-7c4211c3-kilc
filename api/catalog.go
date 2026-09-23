@@ -22,6 +22,9 @@ var levelLabels = map[string]string{
 }
 
 type catalogCard struct {
+	Reward     string
+	Bonus      int
+	Position   int
 	ID         int64
 	Title      string
 	Meta       string
@@ -82,7 +85,8 @@ func Catalog(st *store.Store, tpl *template.Template) http.HandlerFunc {
 		for _, t := range tasks {
 			level := rating.LevelFor(t.Score)
 			page.Cards = append(page.Cards, catalogCard{
-				ID:         t.ID,
+				ID:     t.ID,
+				Reward: t.Reward, Bonus: t.Bonus, Position: t.Score + t.Bonus,
 				Title:      t.Title,
 				Meta:       joinNonEmpty(" · ", t.Company, t.Industry, store.CategoryLabel(t.Category)),
 				Score:      t.Score,

@@ -24,18 +24,19 @@
   <a href="/">Сбросить</a>
 </form>
 {{if .Error}}<p class="filter-error" role="alert">{{.Error}}</p>{{end}}
-<p class="catalog-count">Найдено задач: {{.Count}} · сортировка по рейтингу</p>
+<p class="catalog-count">Найдено задач: {{.Count}} · сортировка по рейтингу и бонусу</p>
 {{if .Cards}}
 <div class="catalog">
   {{range .Cards}}
   <article class="card level-{{.Level}}">
     <div class="card-head">
-      <h2><a href="/static/task-builder/task.html?id={{.ID}}">{{.Title}}</a></h2>
+      <h2><a class="card-link" href="/static/task-builder/task.html?id={{.ID}}">{{.Title}}</a></h2>
       <span class="score">{{.Score}} / 100</span>
     </div>
     {{if .Meta}}<p class="meta">{{.Meta}}</p>{{end}}
-    <p class="badge">{{.LevelLabel}}{{if eq .Level "draft"}} · Требует уточнения{{end}}{{if eq .Level "priority"}} · ★ Приоритетная{{end}}</p>
+    <p class="badge">{{if eq .Level "priority"}}★ {{end}}{{.LevelLabel}}{{if eq .Level "draft"}} · Требует уточнения{{end}}</p>
     {{if .Category}}<span class="category-tag">{{.Category}}</span>{{end}}
+    {{if .Reward}}<p class="reward-note">✦ {{.Reward}} · бонус +{{.Bonus}}</p>{{end}}
     {{if .Need}}<p class="need">{{.Need}}</p>{{end}}
   </article>
   {{end}}

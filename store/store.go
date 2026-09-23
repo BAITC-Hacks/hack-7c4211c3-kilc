@@ -23,6 +23,14 @@ func Open(path, schema string) (*Store, error) {
 		db.Close()
 		return nil, fmt.Errorf("применить схему: %w", err)
 	}
+	if err := migrateRewards(db); err != nil {
+		db.Close()
+		return nil, err
+	}
+	if err := migrateSessionCompany(db); err != nil {
+		db.Close()
+		return nil, err
+	}
 	return &Store{DB: db}, nil
 }
 

@@ -19,6 +19,9 @@ type QA struct {
 }
 
 type Task struct {
+	Reward            string
+	RewardType        string
+	Bonus             int
 	ID                int64
 	Company           string
 	Title             string
@@ -54,6 +57,7 @@ const (
 )
 
 var ratingFields = map[string]bool{
+	rating.FieldReward:            true,
 	rating.FieldContext:           true,
 	rating.FieldNeed:              true,
 	rating.FieldUsers:             true,
@@ -67,7 +71,7 @@ var ratingFields = map[string]bool{
 
 const taskColumns = `id, company, title, industry, category, draft_text, qa,
 	context, need, users, data, constraints, expected_result, success_criteria,
-	contact, interaction_format, confirmed, status, score, created_at, published_at`
+	contact, interaction_format, confirmed, status, score, created_at, published_at, reward, reward_type, bonus`
 
 func (t Task) Card() rating.Card {
 	confirmed := make(map[string]bool, len(t.Confirmed))
@@ -78,6 +82,7 @@ func (t Task) Card() rating.Card {
 		return rating.Field{Text: text, Confirmed: confirmed[key]}
 	}
 	return rating.Card{
+		RewardType: t.RewardType, Reward: field(rating.FieldReward, t.Reward),
 		Context:           field(rating.FieldContext, t.Context),
 		Need:              field(rating.FieldNeed, t.Need),
 		Users:             field(rating.FieldUsers, t.Users),
@@ -92,6 +97,7 @@ func (t Task) Card() rating.Card {
 
 func (t Task) fieldTexts() map[string]string {
 	return map[string]string{
+		rating.FieldReward:            t.Reward,
 		rating.FieldContext:           t.Context,
 		rating.FieldNeed:              t.Need,
 		rating.FieldUsers:             t.Users,
@@ -105,6 +111,17 @@ func (t Task) fieldTexts() map[string]string {
 }
 
 func validateTask(t *Task) error {
+	t.Reward = strings.TrimSpace(t.Reward)
+	if !rating.ValidRewardType(t.RewardType) {
+		return &ValidationError{Field: "reward_type", Message: "Неизвестный тип вознаграждения"}
+	}
+	if len([]rune(t.Reward)) > 300 {
+		return &ValidationError{Field: "reward", Message: "Описание вознаграждения: не более 300 символов"}
+	}
+	if (t.Reward == "") != (t.RewardType == "") {
+		return &ValidationError{Field: "reward", Message: "Укажите тип и описание вознаграждения вместе"}
+	}
+
 	if strings.TrimSpace(t.DraftText) == "" {
 		return &ValidationError{Field: "draft_text", Message: "исходное описание задачи не может быть пустым"}
 	}
@@ -163,18 +180,19 @@ func (s *Store) CreateTask(ctx context.Context, t *Task) error {
 		return err
 	}
 	t.Status = StatusDraft
-	t.Score = rating.Score(t.Card()).Total
+	result := rating.Score(t.Card())
+	t.Score, t.Bonus = result.Total, result.Bonus
 	t.CreatedAt = time.Now().UTC().Truncate(time.Second)
 	t.PublishedAt = time.Time{}
 
 	res, err := s.DB.ExecContext(ctx, `INSERT INTO tasks (
 		company, title, industry, category, draft_text, qa,
 		context, need, users, data, constraints, expected_result, success_criteria,
-		contact, interaction_format, confirmed, status, score, created_at
-	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		contact, interaction_format, confirmed, status, score, created_at, reward, reward_type, bonus
+	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		t.Company, t.Title, t.Industry, t.Category, t.DraftText, qa,
 		t.Context, t.Need, t.Users, t.Data, t.Constraints, t.ExpectedResult, t.SuccessCriteria,
-		t.Contact, t.InteractionFormat, confirmed, t.Status, t.Score, formatTime(t.CreatedAt))
+		t.Contact, t.InteractionFormat, confirmed, t.Status, t.Score, formatTime(t.CreatedAt), t.Reward, t.RewardType, t.Bonus)
 	if err != nil {
 		return fmt.Errorf("создать задачу: %w", err)
 	}
@@ -194,19 +212,20 @@ func (s *Store) UpdateTask(ctx context.Context, t *Task) error {
 	if err != nil {
 		return err
 	}
-	t.Score = rating.Score(t.Card()).Total
+	result := rating.Score(t.Card())
+	t.Score, t.Bonus = result.Total, result.Bonus
 
 	var createdAt string
 	var publishedAt sql.NullString
 	err = s.DB.QueryRowContext(ctx, `UPDATE tasks SET
 		company = ?, title = ?, industry = ?, category = ?, draft_text = ?, qa = ?,
 		context = ?, need = ?, users = ?, data = ?, constraints = ?, expected_result = ?,
-		success_criteria = ?, contact = ?, interaction_format = ?, confirmed = ?, score = ?
+		success_criteria = ?, contact = ?, interaction_format = ?, confirmed = ?, score = ?, reward = ?, reward_type = ?, bonus = ?
 		WHERE id = ?
 		RETURNING status, created_at, published_at`,
 		t.Company, t.Title, t.Industry, t.Category, t.DraftText, qa,
 		t.Context, t.Need, t.Users, t.Data, t.Constraints, t.ExpectedResult,
-		t.SuccessCriteria, t.Contact, t.InteractionFormat, confirmed, t.Score,
+		t.SuccessCriteria, t.Contact, t.InteractionFormat, confirmed, t.Score, t.Reward, t.RewardType, t.Bonus,
 		t.ID).Scan(&t.Status, &createdAt, &publishedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return ErrNotFound
@@ -236,7 +255,7 @@ func scanTask(row rowScanner) (Task, error) {
 	var publishedAt sql.NullString
 	err := row.Scan(&t.ID, &t.Company, &t.Title, &t.Industry, &t.Category, &t.DraftText, &qa,
 		&t.Context, &t.Need, &t.Users, &t.Data, &t.Constraints, &t.ExpectedResult, &t.SuccessCriteria,
-		&t.Contact, &t.InteractionFormat, &confirmed, &t.Status, &t.Score, &createdAt, &publishedAt)
+		&t.Contact, &t.InteractionFormat, &confirmed, &t.Status, &t.Score, &createdAt, &publishedAt, &t.Reward, &t.RewardType, &t.Bonus)
 	if err != nil {
 		return Task{}, err
 	}
@@ -286,7 +305,7 @@ func (s *Store) PublishTask(ctx context.Context, id int64) error {
 	for _, key := range []string{
 		rating.FieldContext, rating.FieldNeed, rating.FieldUsers, rating.FieldData,
 		rating.FieldConstraints, rating.FieldExpectedResult, rating.FieldSuccessCriteria,
-		rating.FieldContact, rating.FieldInteractionFormat,
+		rating.FieldContact, rating.FieldInteractionFormat, rating.FieldReward,
 	} {
 		if strings.TrimSpace(texts[key]) != "" && !confirmed[key] {
 			unconfirmed = append(unconfirmed, key)
@@ -328,7 +347,7 @@ func (s *Store) ListCatalog(ctx context.Context, f CatalogFilter) ([]Task, error
 		query += ` AND score BETWEEN ? AND ?`
 		args = append(args, min, max)
 	}
-	query += ` ORDER BY score DESC, published_at DESC, id DESC`
+	query += ` ORDER BY (score + bonus) DESC, score DESC, published_at DESC, id DESC`
 
 	rows, err := s.DB.QueryContext(ctx, query, args...)
 	if err != nil {
