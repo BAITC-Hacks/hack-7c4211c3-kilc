@@ -23,7 +23,23 @@
       const link = node('a'); link.href = href; link.append(icon(glyph),node('span',label));
       if (href === current) link.setAttribute('aria-current','page'); nav.append(link);
     }
-    document.querySelector('#session-badge').textContent = session.role === 'business' ? (session.company || 'Бизнес') : session.role === 'student' ? 'Студент' : 'Добро пожаловать';
+    const badge = document.querySelector('#session-badge');
+    badge.textContent = session.role === 'business' ? (session.company || 'Бизнес') : session.role === 'student' ? 'Студент' : 'Добро пожаловать';
+    document.querySelector('.switch-role')?.remove();
+    if (session.role) {
+      const leave = node('button', 'Сменить роль', 'secondary switch-role'); leave.type = 'button';
+      leave.addEventListener('click', async () => {
+        if (!confirm('Сменить роль? Задачи, команды и отклики сохранятся; в этом браузере нужно будет снова выбрать роль.')) return;
+        leave.disabled = true;
+        try {
+          const response = await fetch('/api/session', { method: 'DELETE', credentials: 'same-origin' });
+          if (!response.ok) throw new Error('Не удалось сменить роль. Попробуйте ещё раз.');
+          try { sessionStorage.clear(); } catch { /* Role selection works without browser storage. */ }
+          location.href = '/static/task-builder/login.html';
+        } catch (error) { leave.disabled = false; alert(error.message); }
+      });
+      badge.after(leave);
+    }
   }
   TaskLab.ready.then(render).catch(error => {
     const nav = document.querySelector('.nav'); if (!nav) return;

@@ -100,4 +100,12 @@ func TestSessionRoleTeamAndReward(t *testing.T) {
 	newStudent := call(nil, "POST", "/api/session", `{"role":"student"}`, 201).Result().Cookies()[0]
 	call(newStudent, "POST", "/api/teams", `{"name":"Новая команда","interests":[]}`, 201)
 	call(newStudent, "POST", "/api/session/team", `{"team_id":1}`, 409)
+	call(newStudent, "POST", "/api/session", `{"role":"business"}`, 409)
+	if left := call(newStudent, "DELETE", "/api/session", "", 200).Result().Cookies(); len(left) != 1 || left[0].MaxAge >= 0 {
+		t.Fatalf("leaving the session must expire the cookie: %+v", left)
+	}
+	call(newStudent, "GET", "/api/teams", "", 401)
+	switched := call(nil, "POST", "/api/session", `{"role":"business"}`, 201).Result().Cookies()[0]
+	call(switched, "POST", "/api/session/company", `{"company":"Test company"}`, 200)
+	call(switched, "GET", path, "", 200)
 }

@@ -68,8 +68,21 @@ func SessionAccess(st *store.Store, next http.Handler) http.Handler {
 				writeJSON(w, 200, s)
 				return
 			}
+			if r.Method == "DELETE" {
+				// Leaving a session lets one browser demo both roles. Tasks, teams
+				// and proposals stay; only this browser's role binding is removed.
+				if s.token != "" {
+					if _, err := st.DB.ExecContext(r.Context(), `DELETE FROM browser_sessions WHERE token=?`, s.token); err != nil {
+						frontendError(w, err)
+						return
+					}
+				}
+				http.SetCookie(w, &http.Cookie{Name: "tasklab-session", Value: "", Path: "/", HttpOnly: true, SameSite: http.SameSiteLaxMode, Secure: r.TLS != nil, MaxAge: -1})
+				writeJSON(w, 200, &browserSession{})
+				return
+			}
 			if r.Method != "POST" {
-				writeError(w, 405, "Используйте GET или POST")
+				writeError(w, 405, "Используйте GET, POST или DELETE")
 				return
 			}
 			var body struct {
