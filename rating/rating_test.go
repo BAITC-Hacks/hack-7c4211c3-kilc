@@ -185,8 +185,8 @@ func TestScoreHintGainOrder(t *testing.T) {
 	card.Data = Field{}
 	card.Users = Field{}
 	result := Score(card)
-	if len(result.Hints) < 2 {
-		t.Fatalf("got %d hints, want at least 2", len(result.Hints))
+	if len(result.Hints) != 2 {
+		t.Fatalf("got %d hints, want 2: %#v", len(result.Hints), result.Hints)
 	}
 	if result.Hints[0].Field != FieldData || result.Hints[0].Gain != 20 {
 		t.Errorf("first hint = %#v, want empty data gain 20", result.Hints[0])

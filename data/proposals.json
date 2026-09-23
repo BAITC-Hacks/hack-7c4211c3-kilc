@@ -1,0 +1,45 @@
+[
+  {
+    "task_key": "card_retail_crm",
+    "team_key": "team_byte",
+    "idea": "Веб-CRM с карточкой покупателя и историей начисления баллов, импорт текущей таблицы из Excel",
+    "plan": "Неделя 1: модель данных и импорт. Неделя 2: интерфейс кассира. Неделя 3: отчёты для маркетолога.",
+    "deadline": "2026-10-30",
+    "prototype_url": "https://example.com/byte-batyry/loyalty-crm",
+    "decision": "accepted",
+    "stage_points": 10
+  },
+  {
+    "task_key": "card_retail_crm",
+    "team_key": "team_link",
+    "idea": "Подключить готовую open-source CRM и синхронизировать её с 1С",
+    "plan": "Развернуть CRM, настроить обмен с 1С, обучить кассиров.",
+    "deadline": "2026-11-20",
+    "prototype_url": "https://example.com/integra/crm-sync",
+    "decision": "rejected"
+  },
+  {
+    "task_key": "card_logistics_analytics",
+    "team_key": "team_data",
+    "idea": "Дашборд задержек на основе журнала рейсов с разбивкой по маршрутам и причинам",
+    "plan": "Очистка данных из TMS, расчёт показателей, дашборд и еженедельная рассылка.",
+    "deadline": "2026-11-15",
+    "prototype_url": "https://example.com/data-dala/delays"
+  },
+  {
+    "task_key": "card_horeca_bot",
+    "team_key": "team_bot",
+    "idea": "Telegram-бот с меню, выбором времени получения и уведомлением бариста",
+    "plan": "Прототип бота за две недели, пилот в одной кофейне, затем подключение остальных.",
+    "deadline": "2026-12-10",
+    "prototype_url": "https://example.com/shapagat/coffee-bot"
+  },
+  {
+    "task_key": "card_education_booking",
+    "team_key": "team_web",
+    "idea": "Одностраничный сайт с расписанием групп и формой записи",
+    "plan": "Уточнить с центром расписание и поля формы, сверстать сайт, подключить уведомления администратору.",
+    "deadline": "2026-12-20",
+    "prototype_url": "https://example.com/kokzhiek/booking"
+  }
+]

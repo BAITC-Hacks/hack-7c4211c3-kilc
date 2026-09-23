@@ -1,0 +1,23 @@
+{{define "layout"}}<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <title>Каталог задач — KILC</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="site-header">
+    <h1>Каталог задач</h1>
+    <label class="role">Роль
+      <select name="role">
+        <option value="business">Бизнес</option>
+        <option value="team">Студенческая команда</option>
+      </select>
+    </label>
+  </header>
+  <main>
+    {{block "content" .}}{{end}}
+  </main>
+</body>
+</html>
+{{end}}
