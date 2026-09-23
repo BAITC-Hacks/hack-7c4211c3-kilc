@@ -41,6 +41,25 @@ main {
   gap: 16px;
 }
 
+.catalog-filters {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 16px;
+  background: #fff;
+  border: 1px solid #d8dde3;
+  border-radius: 8px;
+}
+
+.catalog-filters label { display: grid; gap: 5px; color: #59636e; font-size: 13px; }
+.catalog-filters select, .catalog-filters button { padding: 7px 10px; font: inherit; }
+.catalog-filters a { padding: 7px 2px; }
+.catalog-count { margin: 0 0 16px; color: #59636e; font-size: 14px; }
+.filter-error { color: #a12622; }
+.category-tag { display: inline-block; margin: 0 0 8px; padding: 3px 9px; border-radius: 12px; background: #eef1f4; color: #414b55; font-size: 12px; }
+
 .card {
   padding: 16px 20px;
   background: #fff;
@@ -89,8 +108,8 @@ main {
 .level-draft { border-left-color: #b8bfc7; }
 .level-draft .badge { background: #fff4e5; color: #8a4b00; }
 .level-working { border-left-color: #e0b400; }
-.level-ready { border-left-color: #2f9e44; }
-.level-priority { border: 2px solid #1c6dd0; border-left-width: 6px; background: #eef5ff; }
+.level-ready { border-color: #2f9e44; border-left-width: 6px; }
+.level-priority { border: 2px solid #1c6dd0; border-left-width: 6px; background: #eef5ff; box-shadow: 0 2px 8px #1c6dd033; }
 .level-priority .badge { background: #1c6dd0; color: #fff; }
 
 .empty {

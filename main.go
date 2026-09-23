@@ -56,6 +56,7 @@ func main() {
 	api.RegisterFrontend(mux, st)
 	api.RegisterProposals(mux, st)
 	api.RegisterBusiness(mux, st)
+	api.RegisterRecommendations(mux, st)
 	mux.HandleFunc("GET /{$}", api.Catalog(st, tpl))
 	mux.Handle("GET /static/", http.FileServerFS(assets))
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
