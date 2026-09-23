@@ -1,4 +1,28 @@
 {{define "content"}}
+<form class="catalog-filters" method="get" action="/">
+  <label>Категория
+    <select name="category">
+      <option value="">Все категории</option>
+      {{range .Categories}}<option value="{{.Code}}"{{if eq $.Category .Code}} selected{{end}}>{{.Label}}</option>{{end}}
+    </select>
+  </label>
+  <label>Отрасль
+    <select name="industry">
+      <option value="">Все отрасли</option>
+      {{range .Industries}}<option value="{{.}}"{{if eq $.Industry .}} selected{{end}}>{{.}}</option>{{end}}
+    </select>
+  </label>
+  <label>Уровень
+    <select name="level">
+      <option value="">Все уровни</option>
+      {{range .Levels}}<option value="{{.Code}}"{{if eq $.Level .Code}} selected{{end}}>{{.Label}} ({{.Min}}–{{.Max}})</option>{{end}}
+    </select>
+  </label>
+  <button type="submit">Показать</button>
+  <a href="/">Сбросить</a>
+</form>
+{{if .Error}}<p class="filter-error">{{.Error}}</p>{{end}}
+<p class="catalog-count">Найдено задач: {{.Count}} · сортировка по рейтингу</p>
 {{if .Cards}}
 <div class="catalog">
   {{range .Cards}}
@@ -8,12 +32,13 @@
       <span class="score">{{.Score}} / 100</span>
     </div>
     {{if .Meta}}<p class="meta">{{.Meta}}</p>{{end}}
-    <p class="badge">{{.LevelLabel}}{{if eq .Level "draft"}} · Требует уточнения{{end}}</p>
+    <p class="badge">{{.LevelLabel}}{{if eq .Level "draft"}} · Требует уточнения{{end}}{{if eq .Level "priority"}} · ★ Приоритетная{{end}}</p>
+    {{if .Category}}<span class="category-tag">{{.Category}}</span>{{end}}
     {{if .Need}}<p class="need">{{.Need}}</p>{{end}}
   </article>
   {{end}}
 </div>
 {{else}}
-<p class="empty">Опубликованных задач пока нет</p>
+{{if or .Category .Industry .Level}}<p class="empty">По выбранным фильтрам задач нет</p>{{else}}<p class="empty">Опубликованных задач пока нет</p>{{end}}
 {{end}}
 {{end}}
