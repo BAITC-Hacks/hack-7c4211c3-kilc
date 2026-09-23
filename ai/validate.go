@@ -4,8 +4,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"regexp"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/BAITC-Hacks/hack-7c4211c3-kilc/store"
 )
@@ -13,15 +14,17 @@ import (
 // ErrInvalidOutput marks model output that cannot be turned into a result.
 var ErrInvalidOutput = errors.New("некорректный ответ модели")
 
-var (
-	digitRun     = regexp.MustCompile(`\d+`)
-	emailPattern = regexp.MustCompile(`[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}`)
-)
-
 // cardKeys lists the JSON keys of Card in output order.
 var cardKeys = []string{
 	"title", "category", "context", "need", "users", "data", "constraints",
 	"expected_result", "success_criteria", "contact", "interaction_format",
+}
+
+var cardLimits = map[string]int{
+	"title": 120, "category": 32, "context": 2000, "need": 2000,
+	"users": 1000, "data": 2000, "constraints": 2000,
+	"expected_result": 2000, "success_criteria": 2000,
+	"contact": 250, "interaction_format": 1000,
 }
 
 // ParseQuestions keeps only well-formed questions about allowed fields.
@@ -49,7 +52,7 @@ func ParseQuestions(raw []byte) ([]Question, error) {
 		text, textOK := fields["question"].(string)
 		field = strings.TrimSpace(field)
 		text = strings.TrimSpace(text)
-		if !fieldOK || !textOK || text == "" || !isAllowedField(field) || seen[field] {
+		if !fieldOK || !textOK || text == "" || utf8.RuneCountInString(text) > 2000 || !isAllowedField(field) || seen[field] {
 			continue
 		}
 		seen[field] = true
@@ -64,8 +67,9 @@ func ParseQuestions(raw []byte) ([]Question, error) {
 	return questions, nil
 }
 
-// ParseCard keeps only card fields whose facts come from the draft and answers.
-// The returned list explains every dropped value.
+// ParseCard accepts extractive text from the draft/answers, never free paraphrases.
+// It drops unknown/invalid fields and rejects cards with no usable source text.
+// Reasons contain schema keys only, not user/model text or credentials.
 func ParseCard(raw []byte, draft string, qa []QA) (Card, []string, error) {
 	var top map[string]json.RawMessage
 	if err := json.Unmarshal(raw, &top); err != nil {
@@ -80,16 +84,25 @@ func ParseCard(raw []byte, draft string, qa []QA) (Card, []string, error) {
 		return Card{}, nil, fmt.Errorf("%w: card не объект", ErrInvalidOutput)
 	}
 
-	input := strings.ToLower(draft)
+	sources := []string{draft}
 	for _, item := range qa {
-		input += "\n" + strings.ToLower(item.Answer)
+		if isAllowedField(item.Field) {
+			sources = append(sources, item.Answer)
+		}
 	}
+	evidence := sourceUnits(sources)
 
 	var card Card
 	var dropped []string
+	for key := range values {
+		if _, known := cardLimits[key]; !known {
+			dropped = append(dropped, "неизвестное поле отброшено")
+		}
+	}
+	usable := false
 	for _, key := range cardKeys {
 		value, present := values[key]
-		if !present || value == nil {
+		if !present {
 			continue
 		}
 		text, isString := value.(string)
@@ -98,34 +111,82 @@ func ParseCard(raw []byte, draft string, qa []QA) (Card, []string, error) {
 			continue
 		}
 		text = strings.TrimSpace(text)
+		if utf8.RuneCountInString(text) > cardLimits[key] {
+			dropped = append(dropped, key+": превышена допустимая длина")
+			continue
+		}
 		if key == "category" {
 			if !store.ValidCategory(text) {
-				dropped = append(dropped, "category: код "+text+" не из списка")
+				dropped = append(dropped, "category: код не из списка")
 				continue
 			}
-		} else if reason := fabricated(text, input); reason != "" {
-			dropped = append(dropped, key+": "+reason)
+		} else if text != "" && !groundedText(text, evidence) {
+			dropped = append(dropped, key+": текст не совпадает с предложением или строкой исходных данных")
 			continue
 		}
 		*cardKeyField(&card, key) = text
+		if key != "category" && text != "" {
+			usable = true
+		}
+	}
+	if !usable {
+		return Card{}, dropped, fmt.Errorf("%w: карточка не содержит подтверждённого исходными данными текста", ErrInvalidOutput)
 	}
 	return card, dropped, nil
 }
 
-// fabricated names the first number or email in value that is absent from input.
-func fabricated(value, input string) string {
-	lower := strings.ToLower(value)
-	for _, number := range digitRun.FindAllString(lower, -1) {
-		if !strings.Contains(input, number) {
-			return "число " + number + " отсутствует во вводе"
+// sourceUnits includes whole inputs and complete sentences/lines, so a model
+// cannot create evidence by dropping a negation or combining individual words.
+func sourceUnits(sources []string) map[string]bool {
+	units := make(map[string]bool)
+	for _, source := range sources {
+		units[normalizeExcerpt(source)] = true
+		for _, unit := range textUnits(source) {
+			units[normalizeExcerpt(unit)] = true
 		}
 	}
-	for _, email := range emailPattern.FindAllString(lower, -1) {
-		if !strings.Contains(input, email) {
-			return "email " + email + " отсутствует во вводе"
+	delete(units, "")
+	return units
+}
+
+func normalizeExcerpt(text string) string {
+	return strings.TrimRight(strings.ToLower(strings.Join(strings.Fields(text), " ")), ".!?")
+}
+
+func groundedText(text string, evidence map[string]bool) bool {
+	if evidence[normalizeExcerpt(text)] {
+		return true
+	}
+	units := textUnits(text)
+	if len(units) == 0 {
+		return false
+	}
+	for _, unit := range units {
+		if !evidence[normalizeExcerpt(unit)] {
+			return false
 		}
 	}
-	return ""
+	return true
+}
+
+func textUnits(text string) []string {
+	runes := []rune(text)
+	var units []string
+	start := 0
+	for i, r := range runes {
+		lineEnd := r == '\n' || r == '\r'
+		sentenceEnd := strings.ContainsRune(".!?", r) && (i+1 == len(runes) || unicode.IsSpace(runes[i+1]))
+		if lineEnd || sentenceEnd {
+			if unit := strings.TrimSpace(string(runes[start : i+1])); unit != "" {
+				units = append(units, unit)
+			}
+			start = i + 1
+		}
+	}
+	if unit := strings.TrimSpace(string(runes[start:])); unit != "" {
+		units = append(units, unit)
+	}
+	return units
 }
 
 func cardKeyField(card *Card, key string) *string {

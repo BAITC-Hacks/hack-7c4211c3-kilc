@@ -26,6 +26,9 @@ var seedFiles embed.FS
 var assets embed.FS
 
 func main() {
+	if err := loadEnv(".env"); err != nil {
+		log.Fatalf("старт: .env: %v", err)
+	}
 	port := envOr("PORT", "8080")
 	dbPath := envOr("DB_PATH", "data.db")
 
