@@ -11,7 +11,7 @@ Hard deadline: 18:00. Working code beats complete code.
 
 ## Stack
 
-- Language/runtime: Go 1.22+
+- Language/runtime: Go 1.25+ (required by the SQLite driver; older Go auto-downloads the toolchain)
 - HTTP: `net/http` stdlib. No Gin, Echo, Chi, or any web framework.
 - Templates: `html/template` stdlib, server-rendered.
 - Storage: SQLite via `modernc.org/sqlite` (pure Go, no CGO).
