@@ -1,0 +1,19 @@
+{{define "content"}}
+{{if .Cards}}
+<div class="catalog">
+  {{range .Cards}}
+  <article class="card level-{{.Level}}">
+    <div class="card-head">
+      <h2>{{.Title}}</h2>
+      <span class="score">{{.Score}} / 100</span>
+    </div>
+    {{if .Meta}}<p class="meta">{{.Meta}}</p>{{end}}
+    <p class="badge">{{.LevelLabel}}{{if eq .Level "draft"}} · Требует уточнения{{end}}</p>
+    {{if .Need}}<p class="need">{{.Need}}</p>{{end}}
+  </article>
+  {{end}}
+</div>
+{{else}}
+<p class="empty">Опубликованных задач пока нет</p>
+{{end}}
+{{end}}
