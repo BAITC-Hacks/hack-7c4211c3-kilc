@@ -34,7 +34,7 @@ type chatMessage struct {
 type chatRequest struct {
 	Model          string            `json:"model"`
 	Temperature    float64           `json:"temperature"`
-	ResponseFormat map[string]string `json:"response_format"`
+	ResponseFormat map[string]string `json:"response_format,omitempty"`
 	Messages       []chatMessage     `json:"messages"`
 }
 
@@ -87,7 +87,7 @@ func (m Model) complete(ctx context.Context, prompt string, payload any) ([]byte
 	if err != nil {
 		return nil, fmt.Errorf("ai: кодирование запроса: %w", err)
 	}
-	body, err := json.Marshal(chatRequest{
+	return m.send(ctx, chatRequest{
 		Model:          m.Name,
 		Temperature:    0,
 		ResponseFormat: map[string]string{"type": "json_object"},
@@ -96,6 +96,11 @@ func (m Model) complete(ctx context.Context, prompt string, payload any) ([]byte
 			{Role: "user", Content: string(user)},
 		},
 	})
+}
+
+// send posts one chat completions request and returns the message content.
+func (m Model) send(ctx context.Context, request chatRequest) ([]byte, error) {
+	body, err := json.Marshal(request)
 	if err != nil {
 		return nil, fmt.Errorf("ai: кодирование запроса: %w", err)
 	}
