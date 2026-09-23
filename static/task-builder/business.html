@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Кабинет бизнеса — TaskLab</title>
-  <link rel="stylesheet" href="account.css">
-  <script src="client.js" defer></script><script src="business.js" defer></script>
+  <link rel="stylesheet" href="/static/task-builder/account.css"><script src="/static/nav.js" defer></script>
+  <script src="/static/task-builder/client.js" defer></script><script src="/static/task-builder/business.js" defer></script>
 </head>
 <body>
-  <header class="topbar"><a class="brand" href="/">◈ TaskLab</a><nav class="nav" aria-label="Основная навигация"><a href="/">Каталог</a><a href="/static/task-builder/teams.html">Команды</a><a href="/static/task-builder/index.html">Новая задача</a><a href="/static/task-builder/business.html" aria-current="page">Кабинет бизнеса</a><a href="/static/task-builder/login.html">Сменить роль</a></nav></header>
+  <header class="topbar"><a class="brand" href="/">◈ TaskLab</a><nav class="nav" aria-label="Основная навигация"><a href="/">Каталог</a><a href="/static/task-builder/index.html">Новая задача</a><a href="/static/task-builder/teams.html">Команды</a><a href="/static/task-builder/business.html">Кабинет бизнеса</a><a href="/static/task-builder/login.html" data-role-link>Роль: не выбрана</a></nav></header>
   <main>
     <div class="page-heading"><div><span class="eyebrow">КАБИНЕТ БИЗНЕСА</span><h1>Ваши задачи и команды</h1><p>Сравните предложения и выберите, с кем продолжить работу.</p></div></div>
     <div class="business-tools"><div class="field"><label for="company">Компания</label><select id="company"><option value="">Все компании</option></select></div><button id="refresh" type="button" class="secondary">Обновить</button></div>

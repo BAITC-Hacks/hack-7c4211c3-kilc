@@ -10,13 +10,13 @@ function saveSelection(key, value) {
   catch { throw new Error('Не удалось сохранить выбранную роль или команду в браузере.'); }
 }
 
-if (page === 'login' || page === 'register') {
+if (page === 'login') {
   $('#auth-form').addEventListener('submit', event => {
     event.preventDefault();
     try {
       const role = event.currentTarget.elements.role.value;
       saveSelection(ROLE_KEY, role);
-      location.href = role === 'business' ? 'business.html' : 'teams.html';
+      location.href = role === 'business' ? '/static/task-builder/business.html' : '/static/task-builder/teams.html';
     } catch (error) { $('#auth-error').textContent = error.message; }
   });
 }
@@ -41,7 +41,7 @@ async function initTeams() {
       saveSelection(TEAM_KEY, team.id);
       selected = team.id;
       render();
-      message(`Выбрана команда «${team.name}». Это выбор роли для работы в MVP, не регистрация участника.`, true);
+      message(`Выбрана команда «${team.name}». Это выбор роли для работы в MVP, без учёта участников.`, true);
       document.dispatchEvent(new CustomEvent('team:selected', { detail: team }));
     } catch (error) { message(error.message); }
   }
