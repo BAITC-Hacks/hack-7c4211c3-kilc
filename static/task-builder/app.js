@@ -25,11 +25,18 @@ const ratingFields = ['context', 'need', 'users', 'data', 'constraints', 'expect
 const generatedFields = ['title', 'category', ...ratingFields];
 const confirmableFields = [...generatedFields, 'reward'];
 const confirmed = new Set();
+const fieldNames = { title: 'Название', category: 'Категория', context: 'Как устроено сейчас', need: 'Проблема', users: 'Пользователи', data: 'Данные', constraints: 'Ограничения', expected_result: 'Ожидаемый результат', success_criteria: 'Критерии успеха', contact: 'Контакт', interaction_format: 'Обратная связь', reward: 'Вознаграждение' };
+function unconfirmedFilled(data) { return confirmableFields.filter(key => data[key] && !confirmed.has(key)); }
+function focusConfirm(key) {
+  const check = form.querySelector(`[data-confirm="${key}"]`) || form.elements[key];
+  check?.scrollIntoView({ block: 'center', behavior: 'smooth' }); check?.focus({ preventScroll: true });
+}
 const DRAFT_KEY = 'tasklab-server-draft-v1';
 let taskId = null;
 let qa = [];
 let questionsDraft = '';
 let currentTask = null;
+let savedStatus = '';
 let revision = 0;
 let timer;
 let busy = false;
@@ -146,7 +153,7 @@ form.addEventListener('input', event => {
   updateChecks(); invalidateRating();
 });
 function preview(task) {
-  currentTask = task;
+  currentTask = task; savedStatus = task.status;
   const container = $('#preview-content'); container.replaceChildren();
   container.append(node('p', `Задача №${task.id} · ${task.status === 'published' ? 'Опубликована' : 'Черновик'} · ${task.rating.total}/100`));
   const list = node('dl');
@@ -162,13 +169,24 @@ async function save(publish) {
   if (busy || !form.reportValidity()) return;
   const body = payload();
   if (!body.draft_text) { setStatus('Введите исходное описание задачи.'); form.elements.draft_text.focus(); return; }
-  if (publish && (!body.title || confirmableFields.some(key => body[key] && !confirmed.has(key)))) {
-    setStatus('Для публикации укажите название и подтвердите все заполненные поля.'); return;
+  if (publish && !body.title) { setStatus('Для публикации укажите название задачи.'); form.elements.title.focus(); return; }
+  const missing = publish ? unconfirmedFilled(body) : [];
+  if (missing.length) {
+    setStatus(`Для публикации подтвердите поля: ${missing.map(key => `«${fieldNames[key] || key}»`).join(', ')}. Отметьте «Сведения проверены» у каждого или общий флажок внизу.`);
+    focusConfirm(missing[0]); return;
   }
   clearTimeout(timer); revision++; lock(true); setStatus('Сохраняем в базе…');
   try {
-    let task = await request(taskId ? `/api/tasks/${taskId}` : '/api/tasks', { method: taskId ? 'PUT' : 'POST', body: JSON.stringify(body) });
+    const wasPublished = savedStatus === 'published';
+    const url = () => taskId ? `/api/tasks/${taskId}` : '/api/tasks';
+    let task = await request(url(), { method: taskId ? 'PUT' : 'POST', body: JSON.stringify(body) });
     taskId = task.id;
+    // The server drops confirmation of a value that changed in this save. Every
+    // confirmation still in the local set was ticked after the last edit, so
+    // saving the now-stored values once more records those explicit confirmations.
+    const dropped = body.confirmed.filter(key => !task.confirmed.includes(key));
+    if (dropped.length) task = await request(url(), { method: 'PUT', body: JSON.stringify(body) });
+    const unpublished = wasPublished && task.status !== 'published';
     confirmed.clear();
     for (const key of task.confirmed) confirmed.add(key);
     history.replaceState(null, '', `?id=${taskId}`);
@@ -182,7 +200,8 @@ async function save(publish) {
         preview(task);
       } catch (error) { setStatus(`Задача №${taskId} сохранена, но публикация не выполнена: ${error.message}`); return; }
     }
-    setStatus(`Задача №${taskId} ${task.status === 'published' ? 'опубликована' : 'сохранена'} в базе.${localWarning}`);
+    const offline = unpublished && !publish ? ' Задача снята с публикации: подтвердите изменённые поля и нажмите «Опубликовать».' : '';
+    setStatus(`Задача №${taskId} ${task.status === 'published' ? 'опубликована' : 'сохранена'} в базе.${offline}${localWarning}`);
     form.dispatchEvent(new CustomEvent('task:saved', { bubbles: true, detail: task }));
   } catch (error) { setStatus(error.message); }
   finally { lock(false); updateChecks(); }
@@ -192,7 +211,7 @@ $('#publish').addEventListener('click', () => save(true));
 $('#reset').textContent = 'Новая задача';
 $('#reset').addEventListener('click', () => {
   if (!confirm('Начать новую задачу? Несохранённые изменения будут потеряны. Записи в базе останутся.')) return;
-  form.reset(); form.elements.company.value = TaskLab.session.company; taskId = null; qa = []; questionsDraft = ''; confirmed.clear(); currentTask = null;
+  form.reset(); form.elements.company.value = TaskLab.session.company; taskId = null; qa = []; questionsDraft = ''; confirmed.clear(); currentTask = null; savedStatus = '';
   renderQuestions(); $('#ai-status').textContent = '';
   history.replaceState(null, '', location.pathname); form.elements.draft_text.readOnly = false;
   $('#preview').hidden = true; saveLocalDraft(); updateChecks(); invalidateRating();
