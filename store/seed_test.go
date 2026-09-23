@@ -101,7 +101,7 @@ func TestSeedUnknownKeyRollsBack(t *testing.T) {
 func TestSeedInvalidProposalRollsBack(t *testing.T) {
 	s := openTestStore(t)
 	fixtures := fstest.MapFS{
-		"tasks.json":     {Data: []byte(`[{"key":"a","title":"CRM","draft_text":"Нужна CRM","publish":true}]`)},
+		"tasks.json":     {Data: []byte(`[{"key":"a","title":"CRM","draft_text":"Нужна CRM","confirmed":["title"],"publish":true}]`)},
 		"teams.json":     {Data: []byte(`[{"key":"t","name":"Альфа"}]`)},
 		"proposals.json": {Data: []byte(`[{"task_key":"a","team_key":"t","idea":"x","plan":"y","deadline":"31.12.2026","prototype_url":"https://example.com"}]`)},
 	}

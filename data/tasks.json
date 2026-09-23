@@ -126,7 +126,7 @@
     "success_criteria": "Количество жалоб на потерянные баллы снизится минимум в 2 раза за 3 месяца",
     "contact": "Пишите отделу маркетинга на адрес loyalty@example.kz",
     "interaction_format": "Еженедельный созвон по средам и чат в Telegram",
-    "confirmed": ["context", "need", "users", "data", "constraints", "expected_result", "success_criteria", "contact", "interaction_format"],
+    "confirmed": ["title", "category", "context", "need", "users", "data", "constraints", "expected_result", "success_criteria", "contact", "interaction_format"],
     "publish": true
   },
   {
@@ -146,7 +146,7 @@
     "success_criteria": "Руководитель сам находит проблемные маршруты без помощи аналитика",
     "contact": "Вопросы направляйте в диспетчерскую: dispatch@example.kz",
     "interaction_format": "Встреча в офисе раз в две недели и переписка по почте",
-    "confirmed": ["context", "need", "users", "data", "constraints", "expected_result", "success_criteria", "contact", "interaction_format"],
+    "confirmed": ["title", "category", "context", "need", "users", "data", "constraints", "expected_result", "success_criteria", "contact", "interaction_format"],
     "publish": true
   },
   {
@@ -168,7 +168,7 @@
     "success_criteria": "Меньше ушедших гостей",
     "contact": "Пишите управляющему сети на адрес hello@example.kz",
     "interaction_format": "",
-    "confirmed": ["context", "need", "users", "data", "expected_result", "success_criteria", "contact"],
+    "confirmed": ["title", "category", "context", "need", "users", "data", "expected_result", "success_criteria", "contact"],
     "publish": true
   },
   {
@@ -188,7 +188,7 @@
     "success_criteria": "",
     "contact": "Звоните администратору центра или пишите на info@example.kz",
     "interaction_format": "",
-    "confirmed": ["context", "need", "data", "expected_result", "contact"],
+    "confirmed": ["title", "category", "context", "need", "data", "expected_result", "contact"],
     "publish": true
   },
   {
@@ -210,7 +210,7 @@
     "success_criteria": "Не менее 95 процентов результатов попадают в карту без участия регистратуры",
     "contact": "Технические вопросы присылайте на адрес it@example.kz",
     "interaction_format": "",
-    "confirmed": ["context", "need", "users", "data", "constraints", "expected_result", "success_criteria", "contact"],
+    "confirmed": ["title", "category", "context", "need", "users", "data", "constraints", "expected_result", "success_criteria", "contact"],
     "publish": true
   }
 ]

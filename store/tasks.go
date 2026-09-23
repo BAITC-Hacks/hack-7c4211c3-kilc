@@ -53,16 +53,27 @@ const (
 	StatusPublished = "published"
 )
 
-var ratingFields = map[string]bool{
-	rating.FieldContext:           true,
-	rating.FieldNeed:              true,
-	rating.FieldUsers:             true,
-	rating.FieldData:              true,
-	rating.FieldConstraints:       true,
-	rating.FieldExpectedResult:    true,
-	rating.FieldSuccessCriteria:   true,
-	rating.FieldContact:           true,
-	rating.FieldInteractionFormat: true,
+const (
+	FieldTitle    = "title"
+	FieldCategory = "category"
+)
+
+// confirmableFields lists every key accepted in Task.Confirmed, in the order
+// used for publication errors. Title and category are confirmed but never scored.
+var confirmableFields = []string{
+	FieldTitle, FieldCategory,
+	rating.FieldContext, rating.FieldNeed, rating.FieldUsers, rating.FieldData,
+	rating.FieldConstraints, rating.FieldExpectedResult, rating.FieldSuccessCriteria,
+	rating.FieldContact, rating.FieldInteractionFormat, rating.FieldReward,
+}
+
+func isConfirmable(key string) bool {
+	for _, f := range confirmableFields {
+		if f == key {
+			return true
+		}
+	}
+	return false
 }
 
 const taskColumns = `id, company, title, industry, category, draft_text, qa,
@@ -104,6 +115,52 @@ func (t Task) fieldTexts() map[string]string {
 	}
 }
 
+// confirmableTexts returns the stored value of every confirmable field the
+// task holds. Reward is absent until the task stores a reward.
+func (t Task) confirmableTexts() map[string]string {
+	texts := t.fieldTexts()
+	texts[FieldTitle] = t.Title
+	texts[FieldCategory] = t.Category
+	return texts
+}
+
+// keepUnchangedConfirmations returns the requested confirmations whose field
+// value equals the stored one. A changed field must be confirmed again by a
+// later save.
+func keepUnchangedConfirmations(t, stored Task) []string {
+	next, prev := t.confirmableTexts(), stored.confirmableTexts()
+	confirmed := make([]string, 0, len(t.Confirmed))
+	for _, f := range t.Confirmed {
+		if next[f] == prev[f] {
+			confirmed = append(confirmed, f)
+		}
+	}
+	return confirmed
+}
+
+// publicationError reports why the task cannot be visible in the catalog:
+// every filled confirmable field must be confirmed and the title is required.
+func publicationError(t Task) error {
+	confirmed := make(map[string]bool, len(t.Confirmed))
+	for _, f := range t.Confirmed {
+		confirmed[f] = true
+	}
+	texts := t.confirmableTexts()
+	var unconfirmed []string
+	for _, key := range confirmableFields {
+		if strings.TrimSpace(texts[key]) != "" && !confirmed[key] {
+			unconfirmed = append(unconfirmed, key)
+		}
+	}
+	if len(unconfirmed) > 0 {
+		return &ValidationError{Field: "confirmed", Message: "подтвердите поля перед публикацией: " + strings.Join(unconfirmed, ", ")}
+	}
+	if strings.TrimSpace(t.Title) == "" {
+		return &ValidationError{Field: "title", Message: "укажите название задачи перед публикацией"}
+	}
+	return nil
+}
+
 func validateTask(t *Task) error {
 	if strings.TrimSpace(t.DraftText) == "" {
 		return &ValidationError{Field: "draft_text", Message: "исходное описание задачи не может быть пустым"}
@@ -114,7 +171,7 @@ func validateTask(t *Task) error {
 	seen := make(map[string]bool, len(t.Confirmed))
 	confirmed := make([]string, 0, len(t.Confirmed))
 	for _, f := range t.Confirmed {
-		if !ratingFields[f] {
+		if !isConfirmable(f) {
 			return &ValidationError{Field: "confirmed", Message: "неизвестное поле «" + f + "»"}
 		}
 		if seen[f] {
@@ -186,42 +243,63 @@ func (s *Store) CreateTask(ctx context.Context, t *Task) error {
 	return nil
 }
 
+// UpdateTask saves the editable fields of a task. Within one transaction it
+// compares them with the stored values: draft_text cannot change, a changed
+// field loses its confirmation, and a published task left with unconfirmed
+// filled fields returns to draft until it is confirmed and republished.
 func (s *Store) UpdateTask(ctx context.Context, t *Task) error {
 	if err := validateTask(t); err != nil {
 		return err
 	}
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("обновить задачу %d: начать транзакцию: %w", t.ID, err)
+	}
+	defer tx.Rollback()
+
+	stored, err := scanTask(tx.QueryRowContext(ctx, `SELECT `+taskColumns+` FROM tasks WHERE id = ?`, t.ID))
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrNotFound
+	}
+	if err != nil {
+		return fmt.Errorf("прочитать задачу %d: %w", t.ID, err)
+	}
+	if t.DraftText != stored.DraftText {
+		return &ValidationError{Field: "draft_text", Message: "исходное описание задачи нельзя изменять после сохранения"}
+	}
+	t.Confirmed = keepUnchangedConfirmations(*t, stored)
 	qa, confirmed, err := encodeLists(t)
 	if err != nil {
 		return err
 	}
 	t.Score = rating.Score(t.Card()).Total
+	t.Status = stored.Status
+	t.CreatedAt = stored.CreatedAt
+	t.PublishedAt = stored.PublishedAt
+	if t.Status == StatusPublished && publicationError(*t) != nil {
+		t.Status = StatusDraft
+		t.PublishedAt = time.Time{}
+	}
+	publishedAt := sql.NullString{}
+	if !t.PublishedAt.IsZero() {
+		publishedAt = sql.NullString{String: formatTime(t.PublishedAt), Valid: true}
+	}
 
-	var createdAt string
-	var publishedAt sql.NullString
-	err = s.DB.QueryRowContext(ctx, `UPDATE tasks SET
-		company = ?, title = ?, industry = ?, category = ?, draft_text = ?, qa = ?,
+	_, err = tx.ExecContext(ctx, `UPDATE tasks SET
+		company = ?, title = ?, industry = ?, category = ?, qa = ?,
 		context = ?, need = ?, users = ?, data = ?, constraints = ?, expected_result = ?,
-		success_criteria = ?, contact = ?, interaction_format = ?, confirmed = ?, score = ?
-		WHERE id = ?
-		RETURNING status, created_at, published_at`,
-		t.Company, t.Title, t.Industry, t.Category, t.DraftText, qa,
+		success_criteria = ?, contact = ?, interaction_format = ?, confirmed = ?, score = ?,
+		status = ?, published_at = ?
+		WHERE id = ?`,
+		t.Company, t.Title, t.Industry, t.Category, qa,
 		t.Context, t.Need, t.Users, t.Data, t.Constraints, t.ExpectedResult,
 		t.SuccessCriteria, t.Contact, t.InteractionFormat, confirmed, t.Score,
-		t.ID).Scan(&t.Status, &createdAt, &publishedAt)
-	if errors.Is(err, sql.ErrNoRows) {
-		return ErrNotFound
-	}
+		t.Status, publishedAt, t.ID)
 	if err != nil {
 		return fmt.Errorf("обновить задачу %d: %w", t.ID, err)
 	}
-	if t.CreatedAt, err = parseTime(createdAt); err != nil {
-		return err
-	}
-	t.PublishedAt = time.Time{}
-	if publishedAt.Valid {
-		if t.PublishedAt, err = parseTime(publishedAt.String); err != nil {
-			return err
-		}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("обновить задачу %d: завершить транзакцию: %w", t.ID, err)
 	}
 	return nil
 }
@@ -269,34 +347,18 @@ func (s *Store) GetTask(ctx context.Context, id int64) (Task, error) {
 	return t, nil
 }
 
+// PublishTask validates the stored task and makes it visible in the catalog.
+// Publishing an already published task keeps its published_at.
 func (s *Store) PublishTask(ctx context.Context, id int64) error {
 	t, err := s.GetTask(ctx, id)
 	if err != nil {
 		return err
 	}
+	if err := publicationError(t); err != nil {
+		return err
+	}
 	if t.Status == StatusPublished {
 		return nil
-	}
-	confirmed := make(map[string]bool, len(t.Confirmed))
-	for _, f := range t.Confirmed {
-		confirmed[f] = true
-	}
-	var unconfirmed []string
-	texts := t.fieldTexts()
-	for _, key := range []string{
-		rating.FieldContext, rating.FieldNeed, rating.FieldUsers, rating.FieldData,
-		rating.FieldConstraints, rating.FieldExpectedResult, rating.FieldSuccessCriteria,
-		rating.FieldContact, rating.FieldInteractionFormat,
-	} {
-		if strings.TrimSpace(texts[key]) != "" && !confirmed[key] {
-			unconfirmed = append(unconfirmed, key)
-		}
-	}
-	if len(unconfirmed) > 0 {
-		return &ValidationError{Field: "confirmed", Message: "подтвердите поля перед публикацией: " + strings.Join(unconfirmed, ", ")}
-	}
-	if strings.TrimSpace(t.Title) == "" {
-		return &ValidationError{Field: "title", Message: "укажите название задачи перед публикацией"}
 	}
 	_, err = s.DB.ExecContext(ctx, `UPDATE tasks SET status = ?, published_at = ? WHERE id = ?`,
 		StatusPublished, formatTime(time.Now()), id)

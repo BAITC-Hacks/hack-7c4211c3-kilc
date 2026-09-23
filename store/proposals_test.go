@@ -24,7 +24,7 @@ func newProposalFixture(t *testing.T) proposalFixture {
 	t.Helper()
 	s := openTestStore(t)
 	ctx := context.Background()
-	published := Task{DraftText: "Нужна CRM", Title: "CRM для продаж"}
+	published := Task{DraftText: "Нужна CRM", Title: "CRM для продаж", Confirmed: []string{FieldTitle}}
 	if err := s.CreateTask(ctx, &published); err != nil {
 		t.Fatalf("create task: %v", err)
 	}

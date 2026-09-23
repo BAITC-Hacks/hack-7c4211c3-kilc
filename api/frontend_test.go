@@ -58,17 +58,45 @@ func TestFrontendPersistence(t *testing.T) {
 		t.Fatalf("rating: %+v", task.Rating)
 	}
 	call("POST", path+"/publish", "{}", 400)
-	body = strings.Replace(body, `"confirmed":[]`, `"confirmed":["context"]`, 1)
+	body = strings.Replace(body, `"confirmed":[]`, `"confirmed":["title","category","context"]`, 1)
 	call("PUT", path, body, 200)
 	call("POST", path+"/publish", "{}", 200)
-	w = call("GET", "/api/tasks?category=automation&level=draft", "", 200)
-	var tasks []taskView
-	if err := json.Unmarshal(w.Body.Bytes(), &tasks); err != nil {
-		t.Fatal(err)
+	catalog := func() []taskView {
+		t.Helper()
+		w := call("GET", "/api/tasks?category=automation&level=draft", "", 200)
+		var tasks []taskView
+		if err := json.Unmarshal(w.Body.Bytes(), &tasks); err != nil {
+			t.Fatal(err)
+		}
+		return tasks
 	}
-	if len(tasks) != 1 || tasks[0].Rating.Total != 10 || tasks[0].Status != "published" {
+	if tasks := catalog(); len(tasks) != 1 || tasks[0].Rating.Total != 10 || tasks[0].Status != "published" {
 		t.Fatalf("catalog: %+v", tasks)
 	}
+	changed := strings.Replace(body, "is manual", "is manual and slow", 1)
+	w = call("PUT", path, changed, 200)
+	if err := json.Unmarshal(w.Body.Bytes(), &task); err != nil {
+		t.Fatal(err)
+	}
+	if task.Rating.Total != 0 || task.Status != "draft" || strings.Join(task.Confirmed, ",") != "title,category" {
+		t.Fatalf("changed context kept confirmation: status=%s confirmed=%v rating=%d", task.Status, task.Confirmed, task.Rating.Total)
+	}
+	if tasks := catalog(); len(tasks) != 0 {
+		t.Fatalf("unconfirmed card still in catalog: %+v", tasks)
+	}
+	call("POST", path+"/publish", "{}", 400)
+	w = call("PUT", path, changed, 200)
+	if err := json.Unmarshal(w.Body.Bytes(), &task); err != nil {
+		t.Fatal(err)
+	}
+	if task.Rating.Total != 10 {
+		t.Fatalf("reconfirmed context: rating %d, want 10", task.Rating.Total)
+	}
+	call("POST", path+"/publish", "{}", 200)
+	if tasks := catalog(); len(tasks) != 1 {
+		t.Fatalf("republished card missing from catalog: %+v", tasks)
+	}
+	body = changed
 	call("GET", path, "", 200)
 	call("PUT", path, strings.Replace(body, "Original draft", "Changed draft", 1), 400)
 	call("GET", "/api/tasks/nope", "", 400)
