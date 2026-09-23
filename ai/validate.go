@@ -135,8 +135,8 @@ func ParseCard(raw []byte, draft string, qa []QA) (Card, []string, error) {
 	return card, dropped, nil
 }
 
-// sourceUnits includes whole inputs and complete sentences/lines, so a model
-// cannot create evidence by dropping a negation or combining individual words.
+// sourceUnits matches whole inputs and complete sentences/lines rather than
+// individual words or substrings. Human review still determines their meaning.
 func sourceUnits(sources []string) map[string]bool {
 	units := make(map[string]bool)
 	for _, source := range sources {
@@ -150,7 +150,7 @@ func sourceUnits(sources []string) map[string]bool {
 }
 
 func normalizeExcerpt(text string) string {
-	return strings.TrimRight(strings.ToLower(strings.Join(strings.Fields(text), " ")), ".!?")
+	return strings.TrimRight(strings.ToLower(strings.Join(strings.Fields(text), " ")), ".")
 }
 
 func groundedText(text string, evidence map[string]bool) bool {

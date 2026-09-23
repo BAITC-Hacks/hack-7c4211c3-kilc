@@ -159,11 +159,33 @@ func TestModelCardDropsInventedNumber(t *testing.T) {
 	if result.Source != SourceModel || result.Card.Need != "" || result.Card.Data != "Excel" {
 		t.Fatalf("result = %+v", result)
 	}
-	if !strings.Contains(logs.String(), "need: число 40 отсутствует во вводе") {
+	if !strings.Contains(logs.String(), "need: текст не совпадает") {
 		t.Fatalf("dropped item not logged: %s", logs.String())
 	}
 	if !strings.Contains(captured.body.Messages[1].Content, `"qa":[{"field":"data"`) {
 		t.Fatalf("user payload = %s", captured.body.Messages[1].Content)
+	}
+}
+
+func TestCardFallsBackWhenNoGroundedTextRemains(t *testing.T) {
+	for _, content := range []string{
+		`{"card":{}}`,
+		`{"card":{"unknown":"anything"}}`,
+		`{"card":{"category":"crm"}}`,
+		`{"card":{"need":"Компания использует SAP"}}`,
+		`{"card":{"context":true}}`,
+	} {
+		t.Run(content, func(t *testing.T) {
+			server := modelServer(t, http.StatusOK, content, nil)
+			client, logs := fallbackFor(t, server.URL, time.Second)
+			result, err := client.Card(context.Background(), "Нужна CRM", []QA{{Field: "data", Answer: "Excel"}})
+			if err != nil || result.Source != SourceStub || result.Card.Context != "Нужна CRM" || result.Card.Data != "Excel" {
+				t.Fatalf("want source-backed stub: %+v err=%v", result, err)
+			}
+			if !strings.Contains(logs.String(), "переход на заглушку") {
+				t.Fatalf("fallback not logged: %s", logs.String())
+			}
+		})
 	}
 }
 

@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/BAITC-Hacks/hack-7c4211c3-kilc/ai"
 )
 
 func TestParseEnv(t *testing.T) {
@@ -74,5 +76,36 @@ func TestLoadEnvDoesNotPartiallyApplyMalformedFile(t *testing.T) {
 	}
 	if _, exists := os.LookupEnv(key); exists {
 		t.Fatal("invalid file partially applied")
+	}
+}
+
+func TestLoadedEnvConfiguresAIClient(t *testing.T) {
+	for _, key := range []string{"STUB", "AI_API_KEY", "AI_BASE_URL", "AI_MODEL"} {
+		t.Setenv(key, "")
+		if err := os.Unsetenv(key); err != nil {
+			t.Fatal(err)
+		}
+	}
+	path := filepath.Join(t.TempDir(), ".env")
+	if err := os.WriteFile(path, []byte("STUB=0\nAI_API_KEY=fake-test-key\nAI_BASE_URL=http://127.0.0.1:12345/v1\nAI_MODEL=test-model\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := loadEnv(path); err != nil {
+		t.Fatal(err)
+	}
+	client, ok := ai.New().(ai.Fallback)
+	if !ok {
+		t.Fatal("file configuration should select the model client with fallback")
+	}
+	model, ok := client.Primary.(ai.Model)
+	if !ok || model.BaseURL != "http://127.0.0.1:12345/v1" || model.Name != "test-model" || model.APIKey != "fake-test-key" {
+		t.Fatal("model client did not use the file configuration")
+	}
+	t.Setenv("STUB", "1")
+	if err := loadEnv(path); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := ai.New().(ai.Stub); !ok {
+		t.Fatal("shell STUB=1 must override file STUB=0")
 	}
 }
